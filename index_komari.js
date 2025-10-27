@@ -21,9 +21,9 @@ const UUID = process.env.UUID || '9afd1229-b893-40c1-84dd-51e7ce204913';
 const KOMARI_ENDPOINT = process.env.KOMARI_ENDPOINT || '';
 const KOMARI_TOKEN = process.env.KOMARI_TOKEN || '';
 
-// SSL证书配置
+// SSL证书配置 - 修改为从链接下载
 const KOMARI_SSL = process.env.SSL_CERT_FILE || 'gcp.240713.xyz.crt';
-const sslUrl = "-----BEGIN CERTIFICATE-----MIICPDCCAeKgAwIBAgIEaJgaoTAKBggqhkjOPQQDAjBqMQswCQYDVQQGEwJDTjEQMA4GA1UECBMHQmVpamluZzEQMA4GA1UEBxMHQmVpamluZzESMBAGA1UEChMJRklUMkNMT1VEMQ8wDQYDVQQLEwYxUGFuZWwxEjAQBgNVBAMTCTFQYW5lbC1DQTAeFw0yNTA4MTAwNDA1NTBaFw0zNTA4MTAwNDA1NTBaMG8xCzAJBgNVBAYTAkNOMRAwDgYDVQQIEwdCZWlqaW5nMRAwDgYDVQQHEwdCZWlqaW5nMRIwEAYDVQQKEwlGSVQyQ0xPVUQxDzANBgNVBAsTBjFQYW5lbDEXMBUGA1UEAxMOZ2NwLjI0MDcxMy54eXowWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAQ0ShN/eXp5JDQw1t3ef9axLnkgalqu5wMfTsPVzOf5P2hq7q+Tvg4dI8naB6sykCCGRIy++geHqmlSpLTbFNojo3EwbzAOBgNVHQ8BAf8EBAMCBaAwEwYDVR0lBAwwCgYIKwYBBQUHAwEwDAYDVR0TAQH/BAIwADAfBgNVHSMEGDAWgBSPOMoa1748kU3YjyhKdD6R3wkkijAZBgNVHREEEjAQgg5nY3AuMjQwNzEzLnh5ejAKBggqhkjOPQQDAgNIADBFAiEAjfipHJZ9U25ydPn8598C9ddHXm1Bg+lVRJqN4SrTF0MCIAm6GUhlriMLX+AxVyvH7wEMw9Qf7xyUZVGUbfN41G4R-----END CERTIFICATE-----";
+const sslUrl = "https://raw.githubusercontent.com/kmr13-dev/kmr/main/gcp.240713.xyz.crt"; // 修改为证书链接
 const sslPath = path.join(FILE_PATH, KOMARI_SSL);
 
 // Argo隧道配置
@@ -62,32 +62,31 @@ let listPath = path.join(FILE_PATH, 'list.txt');
 let bootLogPath = path.join(FILE_PATH, 'boot.log');
 let configPath = path.join(FILE_PATH, 'config.json');
 
-// SSL证书下载函数
+// SSL证书下载函数 - 修改为从链接下载
 async function downloadSSLCertificate() {
   if (!sslUrl) {
     console.log("SSL certificate URL is empty, skip downloading");
     return false;
   }
 
-  console.log("Downloading SSL certificate...");
+  console.log("Downloading SSL certificate from:", sslUrl);
   
   try {
-    // 如果sslUrl是证书内容而不是URL，直接写入文件
-    if (sslUrl.includes('-----BEGIN CERTIFICATE-----')) {
-      fs.writeFileSync(sslPath, sslUrl);
-      console.log("SSL certificate saved from direct content");
-    } else {
-      // 如果是URL，则下载
-      const response = await axios.get(sslUrl, { responseType: 'stream' });
-      const writer = fs.createWriteStream(sslPath);
-      response.data.pipe(writer);
-      
-      await new Promise((resolve, reject) => {
-        writer.on('finish', resolve);
-        writer.on('error', reject);
-      });
-      console.log("SSL certificate downloaded successfully");
-    }
+    // 从链接下载证书
+    const response = await axios.get(sslUrl, { 
+      responseType: 'stream',
+      timeout: 30000 // 30秒超时
+    });
+    
+    const writer = fs.createWriteStream(sslPath);
+    response.data.pipe(writer);
+    
+    await new Promise((resolve, reject) => {
+      writer.on('finish', resolve);
+      writer.on('error', reject);
+    });
+    
+    console.log("SSL certificate downloaded successfully");
     
     // 验证证书文件
     const certContent = fs.readFileSync(sslPath, 'utf8');
@@ -171,7 +170,7 @@ async function startKomariAgent() {
 
   try {
     // 尝试直接运行二进制文件
-    const komariBinaryPath = '/usr/local/bin/komari-agent';
+    const komariBinaryPath = path.join(FILE_PATH, 'komari-agent');
     if (fs.existsSync(komariBinaryPath)) {
       console.log("Starting Komari agent directly...");
       await exec(`nohup ${komariBinaryPath} > ${FILE_PATH}/komari.log 2>&1 &`, { env });
@@ -225,7 +224,7 @@ async function installKomariAgent() {
     console.log("Installation script downloaded and permissions set");
 
     // 构建安装命令
-    const installCommand = `bash ${installScriptPath} --endpoint "${KOMARI_ENDPOINT}" --token "${KOMARI_TOKEN}" --install-service-name "komari-agent"`;
+    const installCommand = `bash ${installScriptPath} --endpoint "${KOMARI_ENDPOINT}" --token "${KOMARI_TOKEN}" --install-dir "${FILE_PATH}" --install-service-name "komari-agent"`;
     
     console.log("Running Komari installation command...");
     
@@ -412,7 +411,7 @@ async function downloadFilesAndRun() {
 
   // 授权和运行
   function authorizeFiles(filePaths) {
-    const newPermissions = 0o755;
+    const newPermissions = 0o775;
     filePaths.forEach(absoluteFilePath => {
       if (fs.existsSync(absoluteFilePath)) {
         fs.chmod(absoluteFilePath, newPermissions, (err) => {
@@ -597,6 +596,7 @@ trojan://${UUID}@${CFIP}:${CFPORT}?security=tls&sni=${argoDomain}&fp=firefox&typ
     });
   }
 }
+
 // 自动上传节点或订阅
 async function uploadNodes() {
   if (UPLOAD_URL && PROJECT_URL) {
@@ -651,6 +651,7 @@ async function uploadNodes() {
       return;
   }
 }
+
 
 // 90s后删除相关文件（保留Komari相关文件和SSL证书）
 function cleanFiles() {
