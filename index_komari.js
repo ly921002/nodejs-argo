@@ -7,7 +7,7 @@ const path = require("path");
 const { promisify } = require('util');
 const exec = promisify(require('child_process').exec);
 const { execSync } = require('child_process');
-const { spawn } = require('child_process'); // 添加spawn用于启动komari-agent
+const { spawn } = require('child_process');
 
 // 环境变量配置
 const UPLOAD_URL = process.env.UPLOAD_URL || '';
@@ -27,7 +27,6 @@ const NAME = process.env.NAME || '';
 // komari-agent相关环境变量
 const ENDPOINT = process.env.ENDPOINT || 'https://gcp.240713.xyz';
 const TOKEN = process.env.TOKEN || 'rP6F8lvOgWZXViUxnmDq1I';
-const SSL_CERT_FILE = process.env.SSL_CERT_FILE || 'gcp.240713.xyz.crt';
 
 // 创建运行文件夹
 if (!fs.existsSync(FILE_PATH)) {
@@ -54,49 +53,10 @@ const komariAgentName = 'komari-agent';
 let webPath = path.join(FILE_PATH, webName);
 let botPath = path.join(FILE_PATH, botName);
 let komariAgentPath = path.join(FILE_PATH, komariAgentName);
-let sslCertPath = path.join(FILE_PATH, SSL_CERT_FILE);
 let subPath = path.join(FILE_PATH, 'sub.txt');
 let listPath = path.join(FILE_PATH, 'list.txt');
 let bootLogPath = path.join(FILE_PATH, 'boot.log');
 let configPath = path.join(FILE_PATH, 'config.json');
-
-// 下载证书文件
-async function downloadSSLCert() {
-  if (fs.existsSync(sslCertPath)) {
-    console.log('SSL certificate already exists');
-    return true;
-  }
-
-  const certUrl = 'https://raw.githubusercontent.com/ly921002/gcp/main/gcp.240713.xyz.crt';
-  
-  try {
-    console.log('Downloading SSL certificate...');
-    const response = await axios({
-      method: 'get',
-      url: certUrl,
-      responseType: 'stream',
-    });
-
-    const writer = fs.createWriteStream(sslCertPath);
-    response.data.pipe(writer);
-
-    return new Promise((resolve, reject) => {
-      writer.on('finish', () => {
-        writer.close();
-        console.log('SSL certificate downloaded successfully');
-        resolve(true);
-      });
-      writer.on('error', err => {
-        fs.unlink(sslCertPath, () => { });
-        console.error(`SSL certificate download failed: ${err.message}`);
-        reject(err);
-      });
-    });
-  } catch (error) {
-    console.error('Error downloading SSL certificate:', error.message);
-    return false;
-  }
-}
 
 // 下载komari-agent
 async function downloadKomariAgent() {
@@ -145,7 +105,7 @@ async function downloadKomariAgent() {
   }
 }
 
-// 启动komari-agent
+// 启动komari-agent（使用--ignore-unsafe-cert参数）
 function startKomariAgent() {
   if (!ENDPOINT) {
     console.log('ENDPOINT not set, skipping komari-agent startup');
@@ -157,39 +117,27 @@ function startKomariAgent() {
     return;
   }
 
-  if (!fs.existsSync(sslCertPath)) {
-    console.log('SSL certificate not found, skipping komari-agent startup');
-    return;
-  }
-
   try {
-    // 设置环境变量并启动komari-agent
-    const env = {
-      ...process.env,
-      SSL_CERT_FILE: sslCertPath
-    };
-
-    const args = ['-e', ENDPOINT, '-t', TOKEN];
+    // 使用--ignore-unsafe-cert参数启动komari-agent
+    const args = ['-e', ENDPOINT, '-t', TOKEN, '--ignore-unsafe-cert'];
     
     const agentProcess = spawn(komariAgentPath, args, {
-      env: env,
       stdio: 'ignore',
       detached: true,
       cwd: FILE_PATH
     });
 
     agentProcess.unref();
-    console.log('komari-agent started successfully');
+    console.log('komari-agent started successfully with --ignore-unsafe-cert');
     console.log(`ENDPOINT: ${ENDPOINT}`);
     console.log(`TOKEN: ${TOKEN}`);
-    console.log(`SSL_CERT_FILE: ${sslCertPath}`);
 
   } catch (error) {
     console.error('Error starting komari-agent:', error);
   }
 }
 
-// 删除历史节点（原有函数保持不变）
+// 删除历史节点
 function deleteNodes() {
   try {
     if (!UPLOAD_URL) return;
@@ -221,7 +169,7 @@ function deleteNodes() {
   }
 }
 
-// 清理历史文件（修改为保留证书和komari-agent）
+// 清理历史文件
 function cleanupOldFiles() {
   try {
     const files = fs.readdirSync(FILE_PATH);
@@ -229,8 +177,8 @@ function cleanupOldFiles() {
       const filePath = path.join(FILE_PATH, file);
       try {
         const stat = fs.statSync(filePath);
-        // 保留证书文件和komari-agent
-        if (stat.isFile() && file !== SSL_CERT_FILE && file !== komariAgentName) {
+        // 保留komari-agent
+        if (stat.isFile() && file !== komariAgentName) {
           fs.unlinkSync(filePath);
         }
       } catch (err) {
@@ -580,10 +528,10 @@ async function uploadNodes() {
   }
 }
 
-// 清理文件（修改为保留证书和komari-agent）
+// 清理文件（保留komari-agent）
 function cleanFiles() {
   setTimeout(() => {
-    const filesToDelete = [bootLogPath, configPath, webPath, botPath]; // 不删除证书和komari-agent
+    const filesToDelete = [bootLogPath, configPath, webPath, botPath]; // 不删除komari-agent
     
     if (process.platform === 'win32') {
       exec(`del /f /q ${filesToDelete.join(' ')} > nul 2>&1`, (error) => {
@@ -631,15 +579,14 @@ async function startserver() {
     deleteNodes();
     cleanupOldFiles();
     
-    // 下载证书和komari-agent
-    const certDownloaded = await downloadSSLCert();
+    // 下载komari-agent
     const agentDownloaded = await downloadKomariAgent();
     
     await generateConfig();
     await downloadFilesAndRun();
     
-    // 启动komari-agent
-    if (certDownloaded && agentDownloaded) {
+    // 启动komari-agent（使用--ignore-unsafe-cert参数）
+    if (agentDownloaded) {
       startKomariAgent();
     }
     
