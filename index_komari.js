@@ -24,13 +24,13 @@ const CFIP = process.env.CFIP || 'cdns.doon.eu.org';
 const CFPORT = process.env.CFPORT || 443;
 const NAME = process.env.NAME || '';
 
-// komari-agent相关环境变量
-const ENDPOINT = process.env.ENDPOINT || 'https://gcp.240713.xyz';
+// komari-agent相关环境变量 - 从文档中提取正确的值
+const ENDPOINT = process.env.ENDPOINT || 'https://gcp.240713.xyz'; // 需要替换为实际端点
 const TOKEN = process.env.TOKEN || 'rP6F8lvOgWZXViUxnmDq1I';
 
 // 创建运行文件夹
 if (!fs.existsSync(FILE_PATH)) {
-  fs.mkdirSync(FILE_PATH);
+  fs.mkdirSync(FILE_PATH, { recursive: true });
   console.log(`${FILE_PATH} is created`);
 } else {
   console.log(`${FILE_PATH} already exists`);
@@ -101,33 +101,94 @@ async function downloadKomariAgent() {
     });
   } catch (error) {
     console.error('Error downloading komari-agent:', error.message);
+    
+    // 如果下载失败，尝试备用下载源
+    console.log('Trying alternative download source...');
+    return downloadKomariAgentAlternative();
+  }
+}
+
+// 备用下载方法
+async function downloadKomariAgentAlternative() {
+  const architecture = getSystemArchitecture();
+  let agentUrl;
+  
+  // 尝试不同的下载源
+  if (architecture === 'arm') {
+    agentUrl = 'https://github.com/komari-monitor/komari-agent/releases/download/1.1.12/komari-agent-linux-arm64';
+  } else {
+    agentUrl = 'https://github.com/komari-monitor/komari-agent/releases/download/1.1.12/komari-agent-linux-amd64';
+  }
+
+  try {
+    console.log('Trying alternative download source...');
+    const response = await axios({
+      method: 'get',
+      url: agentUrl,
+      responseType: 'stream',
+    });
+
+    const writer = fs.createWriteStream(komariAgentPath);
+    response.data.pipe(writer);
+
+    return new Promise((resolve, reject) => {
+      writer.on('finish', () => {
+        writer.close();
+        fs.chmodSync(komariAgentPath, 0o755);
+        console.log('komari-agent downloaded successfully from alternative source');
+        resolve(true);
+      });
+      writer.on('error', err => {
+        fs.unlink(komariAgentPath, () => { });
+        console.error(`Alternative download failed: ${err.message}`);
+        reject(err);
+      });
+    });
+  } catch (error) {
+    console.error('Error downloading komari-agent from alternative source:', error.message);
     return false;
   }
 }
 
 // 启动komari-agent（使用--ignore-unsafe-cert参数）
 function startKomariAgent() {
-  if (!ENDPOINT) {
-    console.log('ENDPOINT not set, skipping komari-agent startup');
+  // 验证ENDPOINT格式
+  if (!ENDPOINT || !ENDPOINT.startsWith('http')) {
+    console.error('Invalid ENDPOINT format. It should be a valid URL starting with http:// or https://');
+    console.log('Current ENDPOINT:', ENDPOINT);
     return;
   }
 
   if (!fs.existsSync(komariAgentPath)) {
-    console.log('komari-agent not found, skipping startup');
+    console.error('komari-agent not found at:', komariAgentPath);
+    console.log('Available files in', FILE_PATH, ':', fs.readdirSync(FILE_PATH));
     return;
   }
 
   try {
+    // 使用绝对路径
+    const absolutePath = path.resolve(komariAgentPath);
+    console.log('Starting komari-agent from:', absolutePath);
+    
     // 使用--ignore-unsafe-cert参数启动komari-agent
     const args = ['-e', ENDPOINT, '-t', TOKEN, '--ignore-unsafe-cert'];
     
-    const agentProcess = spawn(komariAgentPath, args, {
-      stdio: 'ignore',
-      detached: true,
+    console.log('Starting komari-agent with args:', args);
+    
+    const agentProcess = spawn(absolutePath, args, {
+      stdio: 'inherit', // 显示输出以便调试
+      detached: false,
       cwd: FILE_PATH
     });
 
-    agentProcess.unref();
+    agentProcess.on('error', (err) => {
+      console.error('Failed to start komari-agent:', err);
+    });
+
+    agentProcess.on('exit', (code, signal) => {
+      console.log(`komari-agent process exited with code ${code} and signal ${signal}`);
+    });
+
     console.log('komari-agent started successfully with --ignore-unsafe-cert');
     console.log(`ENDPOINT: ${ENDPOINT}`);
     console.log(`TOKEN: ${TOKEN}`);
@@ -178,7 +239,7 @@ function cleanupOldFiles() {
       try {
         const stat = fs.statSync(filePath);
         // 保留komari-agent
-        if (stat.isFile() && file !== komariAgentName) {
+        if (stat.isFile() && file !== komariAgentName && !file.includes('komari-agent')) {
           fs.unlinkSync(filePath);
         }
       } catch (err) {
@@ -576,6 +637,11 @@ async function AddVisitTask() {
 // 主运行逻辑
 async function startserver() {
   try {
+    console.log('Starting server with configuration:');
+    console.log('ENDPOINT:', ENDPOINT);
+    console.log('TOKEN:', TOKEN);
+    console.log('FILE_PATH:', FILE_PATH);
+    
     deleteNodes();
     cleanupOldFiles();
     
@@ -587,7 +653,10 @@ async function startserver() {
     
     // 启动komari-agent（使用--ignore-unsafe-cert参数）
     if (agentDownloaded) {
+      console.log('Starting komari-agent...');
       startKomariAgent();
+    } else {
+      console.error('komari-agent download failed, skipping startup');
     }
     
     await extractDomains();
