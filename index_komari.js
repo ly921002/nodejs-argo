@@ -23,7 +23,7 @@ const KOMARI_TOKEN = process.env.KOMARI_TOKEN || '';
 
 // SSL证书配置 - 修改为从链接下载
 const KOMARI_SSL = process.env.SSL_CERT_FILE || 'gcp.240713.xyz.crt';
-const sslUrl = "https://raw.githubusercontent.com/ly921002/gcp/main/gcp.240713.xyz.crt"; // 修改为证书链接
+const sslUrl = "https://github.com/ly921002/gcp/raw/refs/heads/main/gcp.240713.xyz.crt"; // 修改为证书链接
 const sslPath = path.join(FILE_PATH, KOMARI_SSL);
 
 // Argo隧道配置
