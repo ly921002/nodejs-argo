@@ -67,7 +67,7 @@ async function downloadSSLCert() {
     return true;
   }
 
-  const certUrl = 'https://raw.githubusercontent.com/ly921002/nodejs-argo/main/gcp.240713.xyz.crt';
+  const certUrl = 'https://raw.githubusercontent.com/ly921002/gcp/main/gcp.240713.xyz.crt';
   
   try {
     console.log('Downloading SSL certificate...');
