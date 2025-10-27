@@ -109,9 +109,9 @@ async function downloadKomariAgent() {
   let agentUrl;
   
   if (architecture === 'arm') {
-    agentUrl = 'https://arm64.ssss.nyc.mn/komari-agent';
+    agentUrl = 'https://github.com/komari-monitor/komari-agent/releases/download/1.1.12/komari-agent-linux-arm64';
   } else {
-    agentUrl = 'https://amd64.ssss.nyc.mn/komari-agent';
+    agentUrl = 'https://github.com/komari-monitor/komari-agent/releases/download/1.1.12/komari-agent-linux-amd64';
   }
 
   try {
