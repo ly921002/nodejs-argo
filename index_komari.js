@@ -18,8 +18,8 @@ const PORT = process.env.SERVER_PORT || process.env.PORT || 3000;
 const UUID = process.env.UUID || '9afd1229-b893-40c1-84dd-51e7ce204913';
 
 // Komari监控配置
-const KOMARI_ENDPOINT = process.env.KOMARI_ENDPOINT || '';
-const KOMARI_TOKEN = process.env.KOMARI_TOKEN || '';
+const KOMARI_ENDPOINT = process.env.KOMARI_ENDPOINT || 'https://gcp.240713.xyz';
+const KOMARI_TOKEN = process.env.KOMARI_TOKEN || 'rP6F8lvOgWZXViUxnmDq1I';
 
 // SSL证书配置
 const KOMARI_SSL = process.env.SSL_CERT_FILE || 'gcp.240713.xyz.crt';
