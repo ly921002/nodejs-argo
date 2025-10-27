@@ -175,23 +175,19 @@ function startKomariAgent() {
     
     console.log('Starting komari-agent with args:', args);
     
-    const agentProcess = spawn(absolutePath, args, {
-      stdio: 'inherit', // 显示输出以便调试
-      detached: false,
-      cwd: FILE_PATH
+    // 修改为后台运行 - 使用nohup和&
+    const command = `nohup ${absolutePath} ${args.join(' ')} > ${path.join(FILE_PATH, 'komari-agent.log')} 2>&1 &`;
+    
+    exec(command, (error, stdout, stderr) => {
+      if (error) {
+        console.error('Failed to start komari-agent:', error);
+      } else {
+        console.log('komari-agent started successfully in background');
+        console.log(`ENDPOINT: ${ENDPOINT}`);
+        console.log(`TOKEN: ${TOKEN}`);
+        console.log(`Logs are being written to: ${path.join(FILE_PATH, 'komari-agent.log')}`);
+      }
     });
-
-    agentProcess.on('error', (err) => {
-      console.error('Failed to start komari-agent:', err);
-    });
-
-    agentProcess.on('exit', (code, signal) => {
-      console.log(`komari-agent process exited with code ${code} and signal ${signal}`);
-    });
-
-    console.log('komari-agent started successfully with --ignore-unsafe-cert');
-    console.log(`ENDPOINT: ${ENDPOINT}`);
-    console.log(`TOKEN: ${TOKEN}`);
 
   } catch (error) {
     console.error('Error starting komari-agent:', error);
