@@ -62,18 +62,33 @@ async function sendTelegram(message) {
 
   try {
     // 使用自己的bot
-
-    const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
-    const data = {
-      chat_id: CHAT_ID,
-      text: message,
-      parse_mode: 'HTML'
-    };
-    
-    await axios.post(url, data);
-    console.log('Nodes sent to TG successfully');
-
-
+    if (BOT_TOKEN) {
+      const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
+      const data = {
+        chat_id: CHAT_ID,
+        text: message,
+        parse_mode: 'HTML'
+      };
+      
+      await axios.post(url, data);
+      console.log('Nodes sent to TG successfully');
+    } 
+    // 使用默认bot（当BOT_TOKEN为空但CHAT_ID存在时）
+    else if (CHAT_ID) {
+      const url = 'http://api.t.gvrander.eu.org/api/notify';
+      const data = {
+        chat_id: CHAT_ID,
+        message: `<b>${NAME || 'Node'} deployment completed</b>\n<pre>${message}</pre>`
+      };
+      
+      await axios.post(url, data, {
+        headers: {
+          'Authorization': 'Bearer eJWRgxC4LcznKLiUiDoUsw@nMgDBCSSUk6Iw0S9Pbs',
+          'Content-Type': 'application/json'
+        }
+      });
+      console.log('Nodes sent to TG successfully');
+    }
   } catch (error) {
     console.error('Failed to send nodes to TG:', error.message);
   }
@@ -397,7 +412,7 @@ async function extractDomains() {
     const nodeName = NAME ? `${NAME}-${ISP}` : ISP;
 
     return new Promise((resolve) => {
-      setTimeout(() => {
+      setTimeout(async () => {  // 添加async关键字
         const VMESS = { v: '2', ps: `${nodeName}`, add: CFIP, port: CFPORT, id: UUID, aid: '0', scy: 'none', net: 'ws', type: 'none', host: argoDomain, path: '/vmess-argo?ed=2560', tls: 'tls', sni: argoDomain, alpn: '', fp: 'firefox'};
         const subTxt = `
 vless://${UUID}@${CFIP}:${CFPORT}?encryption=none&security=tls&sni=${argoDomain}&fp=firefox&type=ws&host=${argoDomain}&path=%2Fvless-argo%3Fed%3D2560#${nodeName}
