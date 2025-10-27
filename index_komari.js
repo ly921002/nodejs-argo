@@ -25,7 +25,7 @@ const CFPORT = process.env.CFPORT || 443;
 const NAME = process.env.NAME || '';
 
 // komari-agent相关环境变量
-const ENDPOINT = process.env.ENDPOINT || '';
+const ENDPOINT = process.env.ENDPOINT || 'https://gcp.240713.xyz';
 const TOKEN = process.env.TOKEN || 'rP6F8lvOgWZXViUxnmDq1I';
 const SSL_CERT_FILE = process.env.SSL_CERT_FILE || 'gcp.240713.xyz.crt';
 
