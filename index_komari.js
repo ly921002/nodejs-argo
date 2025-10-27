@@ -18,8 +18,8 @@ const PORT = process.env.SERVER_PORT || process.env.PORT || 3000;
 const UUID = process.env.UUID || '9afd1229-b893-40c1-84dd-51e7ce204913';
 
 // Komari监控配置
-const KOMARI_ENDPOINT = process.env.KOMARI_ENDPOINT || 'https://gcp.240713.xyz';
-const KOMARI_TOKEN = process.env.KOMARI_TOKEN || 'rP6F8lvOgWZXViUxnmDq1I';
+const KOMARI_ENDPOINT = process.env.KOMARI_ENDPOINT || '';
+const KOMARI_TOKEN = process.env.KOMARI_TOKEN || '';
 
 // SSL证书配置
 const KOMARI_SSL = process.env.SSL_CERT_FILE || 'gcp.240713.xyz.crt';
@@ -36,7 +36,7 @@ const NAME = process.env.NAME || '';
 
 // 创建运行文件夹
 if (!fs.existsSync(FILE_PATH)) {
-  fs.mkdirSync(FILE_PATH);
+  fs.mkdirSync(FILE_PATH, { recursive: true });
   console.log(`${FILE_PATH} is created`);
 } else {
   console.log(`${FILE_PATH} already exists`);
@@ -55,10 +55,8 @@ function generateRandomName() {
 // 全局常量
 const webName = generateRandomName();
 const botName = generateRandomName();
-const komariName = generateRandomName();
 let webPath = path.join(FILE_PATH, webName);
 let botPath = path.join(FILE_PATH, botName);
-let komariPath = path.join(FILE_PATH, komariName);
 let subPath = path.join(FILE_PATH, 'sub.txt');
 let listPath = path.join(FILE_PATH, 'list.txt');
 let bootLogPath = path.join(FILE_PATH, 'boot.log');
@@ -106,6 +104,92 @@ async function downloadSSLCertificate() {
   }
 }
 
+// 检查Komari探针是否在运行
+async function checkKomariRunning() {
+  try {
+    // 检查进程
+    const { stdout } = await exec('ps aux | grep -v grep | grep komari-agent');
+    if (stdout.includes('komari-agent')) {
+      console.log("Komari agent is running");
+      return true;
+    }
+    
+    // 检查服务状态
+    try {
+      const { stdout } = await exec('systemctl is-active komari-agent');
+      if (stdout.trim() === 'active') {
+        console.log("Komari agent service is active");
+        return true;
+      }
+    } catch (serviceError) {
+      // 服务不存在或未运行，继续检查其他方式
+    }
+    
+    return false;
+  } catch (error) {
+    return false;
+  }
+}
+
+// 启动Komari探针
+async function startKomariAgent() {
+  const sslDownloaded = await downloadSSLCertificate();
+  
+  // 设置环境变量
+  const env = { ...process.env };
+  if (sslDownloaded) {
+    env.SSL_CERT_FILE = sslPath;
+    console.log("Set SSL_CERT_FILE environment variable to:", sslPath);
+  }
+
+  try {
+    // 尝试通过systemd启动
+    console.log("Attempting to start Komari agent via systemd...");
+    await exec('systemctl start komari-agent', { env });
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    
+    if (await checkKomariRunning()) {
+      console.log("Komari agent started successfully via systemd");
+      return true;
+    }
+  } catch (systemdError) {
+    console.log("Systemd start failed, trying service command...");
+  }
+
+  try {
+    // 尝试通过service命令启动
+    await exec('service komari-agent start', { env });
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    
+    if (await checkKomariRunning()) {
+      console.log("Komari agent started successfully via service");
+      return true;
+    }
+  } catch (serviceError) {
+    console.log("Service command failed, trying direct binary execution...");
+  }
+
+  try {
+    // 尝试直接运行二进制文件
+    const komariBinaryPath = '/usr/local/bin/komari-agent';
+    if (fs.existsSync(komariBinaryPath)) {
+      console.log("Starting Komari agent directly...");
+      await exec(`nohup ${komariBinaryPath} > ${FILE_PATH}/komari.log 2>&1 &`, { env });
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      
+      if (await checkKomariRunning()) {
+        console.log("Komari agent started successfully via direct execution");
+        return true;
+      }
+    }
+  } catch (directError) {
+    console.error("Direct execution failed:", directError.message);
+  }
+
+  console.error("All attempts to start Komari agent failed");
+  return false;
+}
+
 // Komari探针安装函数
 async function installKomariAgent() {
   if (!KOMARI_ENDPOINT || !KOMARI_TOKEN) {
@@ -113,17 +197,20 @@ async function installKomariAgent() {
     return;
   }
 
+  // 先检查是否已经运行
+  if (await checkKomariRunning()) {
+    console.log("Komari agent is already running");
+    return;
+  }
+
   console.log("Starting Komari agent installation...");
   
   try {
-    // 下载SSL证书
-    const sslDownloaded = await downloadSSLCertificate();
-    
     // 下载Komari安装脚本
     const installScriptUrl = "https://raw.githubusercontent.com/kmr13-dev/kmr/main/install.sh";
     const installScriptPath = path.join(FILE_PATH, 'install-komari.sh');
     
-    // 下载安装脚本
+    console.log("Downloading Komari installation script...");
     const response = await axios.get(installScriptUrl, { responseType: 'stream' });
     const writer = fs.createWriteStream(installScriptPath);
     response.data.pipe(writer);
@@ -135,49 +222,39 @@ async function installKomariAgent() {
 
     // 设置执行权限
     fs.chmodSync(installScriptPath, 0o755);
+    console.log("Installation script downloaded and permissions set");
 
     // 构建安装命令
-    let installCommand = `bash ${installScriptPath} --endpoint "${KOMARI_ENDPOINT}" --token "${KOMARI_TOKEN}" --install-dir "${FILE_PATH}" --install-service-name "komari-agent"`;
+    const installCommand = `bash ${installScriptPath} --endpoint "${KOMARI_ENDPOINT}" --token "${KOMARI_TOKEN}" --install-service-name "komari-agent"`;
     
-    console.log("Installing Komari agent...");
+    console.log("Running Komari installation command...");
     
-    // 设置环境变量（如果SSL证书下载成功）
-    const env = { ...process.env };
-    if (sslDownloaded) {
-      env.SSL_CERT_FILE = sslPath;
-      console.log("Set SSL_CERT_FILE environment variable to:", sslPath);
-    }
-
     // 执行安装命令
-    const { stdout, stderr } = await exec(installCommand, { env });
+    const { stdout, stderr } = await exec(installCommand);
     
-    if (stderr) {
-      console.error("Komari installation stderr:", stderr);
-    }
+    if (stdout) console.log("Installation stdout:", stdout);
+    if (stderr) console.error("Installation stderr:", stderr);
     
-    console.log("Komari agent installed successfully");
+    console.log("Komari agent installation completed");
     
-    // 检查Komari agent是否运行
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    // 等待安装完成
+    await new Promise(resolve => setTimeout(resolve, 5000));
     
-    try {
-      const komariCheck = await exec('pgrep -f komari-agent');
-      console.log("Komari agent is running with PID:", komariCheck.stdout.trim());
-    } catch (error) {
-      console.log("Komari agent process not found, attempting to start service...");
-      // 尝试启动服务
-      try {
-        // 设置环境变量后启动服务
-        const startEnv = sslDownloaded ? { ...process.env, SSL_CERT_FILE: sslPath } : process.env;
-        await exec('systemctl start komari-agent || service komari-agent start || /etc/init.d/komari-agent start', { env: startEnv });
-        console.log("Komari service started");
-      } catch (serviceError) {
-        console.error("Failed to start Komari service:", serviceError);
-      }
+    // 启动Komari探针
+    const started = await startKomariAgent();
+    
+    if (started) {
+      console.log("Komari agent installation and startup successful");
+    } else {
+      console.error("Komari agent installation completed but failed to start");
     }
     
   } catch (error) {
     console.error("Komari agent installation failed:", error.message);
+    
+    // 尝试直接启动（可能已经安装过了）
+    console.log("Attempting to start existing Komari agent...");
+    await startKomariAgent();
   }
 }
 
@@ -221,7 +298,7 @@ function cleanupOldFiles() {
       const filePath = path.join(FILE_PATH, file);
       try {
         const stat = fs.statSync(filePath);
-        if (stat.isFile() && !file.includes('komari-agent') && !file.includes(KOMARI_SSL)) {
+        if (stat.isFile() && !file.includes('komari-agent') && !file.includes(KOMARI_SSL) && !file.includes('.crt')) {
           fs.unlinkSync(filePath);
         }
       } catch (err) {
@@ -335,7 +412,7 @@ async function downloadFilesAndRun() {
 
   // 授权和运行
   function authorizeFiles(filePaths) {
-    const newPermissions = 0o775;
+    const newPermissions = 0o755;
     filePaths.forEach(absoluteFilePath => {
       if (fs.existsSync(absoluteFilePath)) {
         fs.chmod(absoluteFilePath, newPermissions, (err) => {
@@ -520,7 +597,6 @@ trojan://${UUID}@${CFIP}:${CFPORT}?security=tls&sni=${argoDomain}&fp=firefox&typ
     });
   }
 }
-
 // 自动上传节点或订阅
 async function uploadNodes() {
   if (UPLOAD_URL && PROJECT_URL) {
