@@ -23,8 +23,11 @@ const ARGO_PORT = process.env.ARGO_PORT || 8001;
 const CFIP = process.env.CFIP || 'cdns.doon.eu.org';
 const CFPORT = process.env.CFPORT || 443;
 const NAME = process.env.NAME || '';
-
-// komari-agent相关环境变量 - 从文档中提取正确的值
+// 环境变量配置 - 在原有配置后增加
+const ENABLE_CF_ARGO = process.env.ENABLE_CF_ARGO || 'true'; // CF Argo 开关
+const DIRECT_DOMAIN = process.env.DIRECT_DOMAIN || ''; // 直连域名
+const DIRECT_PORT = process.env.DIRECT_PORT || 443; // 直连端口
+// komari-agent相关环境变量
 const ENDPOINT = process.env.ENDPOINT || 'https://gcp.240713.xyz'; // 需要替换为实际端点
 const TOKEN = process.env.TOKEN || 'rP6F8lvOgWZXViUxnmDq1I';
 // Telegram推送相关环境变量
@@ -255,35 +258,72 @@ app.get("/", function(req, res) {
   res.send("Hello world!");
 });
 
-
 // 生成xr-ay配置文件
 async function generateConfig() {
-  const config = {
-    log: { access: '/dev/null', error: '/dev/null', loglevel: 'none' },
-    inbounds: [
-      { 
-        port: ARGO_PORT, 
-        protocol: 'vless', 
-        settings: { 
-          clients: [{ id: UUID, flow: 'xtls-rprx-vision' }], 
-          decryption: 'none', 
-          fallbacks: [{ path: "/vmess-argo", dest: 3003 }]  // 移除了3001端口的fallback
-        }, 
-        streamSettings: { network: 'tcp' } 
-      },
-      { 
-        port: 3003, 
-        listen: "127.0.0.1", 
-        protocol: "vmess", 
-        settings: { clients: [{ id: UUID, alterId: 0 }] }, 
-        streamSettings: { network: "ws", wsSettings: { path: "/vmess-argo" } }, 
-        sniffing: { enabled: true, destOverride: ["http", "tls", "quic"], metadataOnly: false } 
-      }
-    ],
-    dns: { servers: ["https+local://8.8.8.8/dns-query"] },
-    outbounds: [ { protocol: "freedom", tag: "direct" }, {protocol: "blackhole", tag: "block"} ]
-  };
+  const enableCFArgo = ENABLE_CF_ARGO.toLowerCase() === 'true';
+  
+  let config;
+  
+  if (enableCFArgo) {
+    // CF Argo 开启模式：vmess+ws+tls+argo
+    config = {
+      log: { access: '/dev/null', error: '/dev/null', loglevel: 'none' },
+      inbounds: [
+        { 
+          port: ARGO_PORT, 
+          protocol: 'vless', 
+          settings: { 
+            clients: [{ id: UUID, flow: 'xtls-rprx-vision' }], 
+            decryption: 'none', 
+            fallbacks: [{ path: "/vmess-argo", dest: 3003 }]
+          }, 
+          streamSettings: { network: 'tcp' } 
+        },
+        { 
+          port: 3003, 
+          listen: "127.0.0.1", 
+          protocol: "vmess", 
+          settings: { clients: [{ id: UUID, alterId: 0 }] }, 
+          streamSettings: { network: "ws", wsSettings: { path: "/vmess-argo" } }, 
+          sniffing: { enabled: true, destOverride: ["http", "tls", "quic"], metadataOnly: false } 
+        }
+      ],
+      dns: { servers: ["https+local://8.8.8.8/dns-query"] },
+      outbounds: [ { protocol: "freedom", tag: "direct" }, {protocol: "blackhole", tag: "block"} ]
+    };
+  } else {
+    // CF Argo 关闭模式：vmess+ws+tls 直连
+    config = {
+      log: { access: '/dev/null', error: '/dev/null', loglevel: 'none' },
+      inbounds: [
+        { 
+          port: 3000, 
+          listen: "0.0.0.0",
+          protocol: "vmess", 
+          settings: { 
+            clients: [{ id: UUID, alterId: 0 }] 
+          }, 
+          streamSettings: { 
+            network: "ws", 
+            security: "tls",
+            wsSettings: { 
+              path: "/vmess-direct" 
+            },
+            tlsSettings: {
+              serverName: DIRECT_DOMAIN,
+              allowInsecure: false
+            }
+          }, 
+          sniffing: { enabled: true, destOverride: ["http", "tls", "quic"], metadataOnly: false } 
+        }
+      ],
+      dns: { servers: ["https+local://8.8.8.8/dns-query"] },
+      outbounds: [ { protocol: "freedom", tag: "direct" }, {protocol: "blackhole", tag: "block"} ]
+    };
+  }
+  
   fs.writeFileSync(path.join(FILE_PATH, 'config.json'), JSON.stringify(config, null, 2));
+  console.log(`Configuration generated: ${enableCFArgo ? 'CF Argo Enabled' : 'Direct Mode'}`);
 }
 
 // 判断系统架构
@@ -338,6 +378,7 @@ function downloadFile(fileName, fileUrl, callback) {
 async function downloadFilesAndRun() {  
   const architecture = getSystemArchitecture();
   const filesToDownload = getFilesForArchitecture(architecture);
+  const enableCFArgo = ENABLE_CF_ARGO.toLowerCase() === 'true';
 
   if (filesToDownload.length === 0) {
     console.log(`Can't find a file for the current architecture`);
@@ -378,10 +419,14 @@ async function downloadFilesAndRun() {
       }
     });
   }
-  const filesToAuthorize = [webPath, botPath];
+  
+  const filesToAuthorize = [webPath];
+  if (enableCFArgo) {
+    filesToAuthorize.push(botPath);
+  }
   authorizeFiles(filesToAuthorize);
 
-  //运行xr-ay
+  // 运行xr-ay
   const command1 = `nohup ${webPath} -c ${FILE_PATH}/config.json >/dev/null 2>&1 &`;
   try {
     await exec(command1);
@@ -391,8 +436,8 @@ async function downloadFilesAndRun() {
     console.error(`web running error: ${error}`);
   }
 
-  // 运行cloud-fared
-  if (fs.existsSync(botPath)) {
+  // 仅在 CF Argo 开启时运行 cloudflared
+  if (enableCFArgo && fs.existsSync(botPath)) {
     let args;
 
     if (ARGO_AUTH.match(/^[A-Z0-9a-z=]{120,250}$/)) {
@@ -411,6 +456,7 @@ async function downloadFilesAndRun() {
       console.error(`Error executing command: ${error}`);
     }
   }
+  
   await new Promise((resolve) => setTimeout(resolve, 5000));
 }
 
@@ -459,61 +505,315 @@ function argoType() {
 }
 argoType();
 
-// 获取临时隧道domain
+// 获取域名信息
 async function extractDomains() {
-  let argoDomain;
-
-  if (ARGO_AUTH && ARGO_DOMAIN) {
-    argoDomain = ARGO_DOMAIN;
-    console.log('ARGO_DOMAIN:', argoDomain);
-    await generateLinks(argoDomain);
+  const enableCFArgo = ENABLE_CF_ARGO.toLowerCase() === 'true';
+  
+  if (enableCFArgo) {
+    // CF Argo 模式
+    console.log('Running in CF Argo mode');
+    if (ARGO_AUTH && ARGO_DOMAIN) {
+      console.log('ARGO_DOMAIN:', ARGO_DOMAIN);
+      await generateLinks(ARGO_DOMAIN);
+    } else {
+      // 临时隧道逻辑
+      await extractTempDomains();
+    }
   } else {
-    try {
+    // 直连模式
+    console.log('Running in Direct mode');
+    if (!DIRECT_DOMAIN) {
+      console.error('DIRECT_DOMAIN is required when ENABLE_CF_ARGO is false');
+      // 尝试从环境变量或其他地方获取备用域名
+      const fallbackDomain = process.env.SERVER_IP ? 
+        `direct-${process.env.SERVER_IP.replace(/\./g, '-')}.example.com` : 
+        'direct.example.com';
+      console.log(`Using fallback domain: ${fallbackDomain}`);
+      await generateDirectLinks(fallbackDomain);
+    } else {
+      console.log('DIRECT_DOMAIN:', DIRECT_DOMAIN);
+      await generateDirectLinks(DIRECT_DOMAIN);
+    }
+  }
+}
+
+// 直连模式生成链接
+async function generateDirectLinks(domain) {
+  try {
+    const metaInfo = execSync(
+      'curl -sm 5 https://speed.cloudflare.com/meta | awk -F\\" \'{print $26"-"$18}\' | sed -e \'s/ /_/g\'',
+      { encoding: 'utf-8' }
+    );
+    const ISP = metaInfo.trim();
+    const nodeName = NAME ? `${NAME}-${ISP}` : ISP;
+
+    return new Promise((resolve) => {
+      setTimeout(async () => {
+        const VMESS = { 
+          v: '2', 
+          ps: `${nodeName}-Direct`, 
+          add: domain, 
+          port: DIRECT_PORT, 
+          id: UUID, 
+          aid: '0', 
+          scy: 'none', 
+          net: 'ws', 
+          type: 'none', 
+          host: domain, 
+          path: '/vmess-direct', 
+          tls: 'tls', 
+          sni: domain, 
+          alpn: '', 
+          fp: 'firefox'
+        };
+        
+        const subTxt = `vmess://${Buffer.from(JSON.stringify(VMESS)).toString('base64')}`;
+        
+        // 保存订阅文件
+        const encodedContent = Buffer.from(subTxt).toString('base64');
+        console.log('Generated subscription content (Direct Mode):');
+        console.log(encodedContent);
+        fs.writeFileSync(subPath, encodedContent);
+        console.log(`${FILE_PATH}/sub.txt saved successfully (Direct Mode)`);
+        
+        // 推送订阅内容
+        await pushSubscriptionContent();
+        
+        // 上传节点
+        uploadNodes();
+        
+        // 设置订阅路由
+        app.get(`/${SUB_PATH}`, (req, res) => {
+          res.set('Content-Type', 'text/plain; charset=utf-8');
+          res.send(encodedContent);
+        });
+        
+        console.log(`Direct mode configuration completed for domain: ${domain}`);
+        resolve(subTxt);
+      }, 2000);
+    });
+  } catch (error) {
+    console.error('Error generating direct links:', error);
+    // 创建基本的订阅内容作为备用
+    const fallbackVMESS = {
+      v: '2',
+      ps: 'Direct-Fallback',
+      add: domain,
+      port: DIRECT_PORT,
+      id: UUID,
+      aid: '0',
+      scy: 'none',
+      net: 'ws',
+      type: 'none',
+      host: domain,
+      path: '/vmess-direct',
+      tls: 'tls',
+      sni: domain,
+      fp: 'firefox'
+    };
+    
+    const subTxt = `vmess://${Buffer.from(JSON.stringify(fallbackVMESS)).toString('base64')}`;
+    const encodedContent = Buffer.from(subTxt).toString('base64');
+    fs.writeFileSync(subPath, encodedContent);
+    
+    app.get(`/${SUB_PATH}`, (req, res) => {
+      res.set('Content-Type', 'text/plain; charset=utf-8');
+      res.send(encodedContent);
+    });
+    
+    return subTxt;
+  }
+}
+
+// CF Argo 模式生成链接
+async function generateLinks(argoDomain) {
+  try {
+    const metaInfo = execSync(
+      'curl -sm 5 https://speed.cloudflare.com/meta | awk -F\\" \'{print $26"-"$18}\' | sed -e \'s/ /_/g\'',
+      { encoding: 'utf-8' }
+    );
+    const ISP = metaInfo.trim();
+    const nodeName = NAME ? `${NAME}-${ISP}` : ISP;
+
+    return new Promise((resolve) => {
+      setTimeout(async () => {
+        const VMESS = { 
+          v: '2', 
+          ps: `${nodeName}`, 
+          add: CFIP, 
+          port: CFPORT, 
+          id: UUID, 
+          aid: '0', 
+          scy: 'none', 
+          net: 'ws', 
+          type: 'none', 
+          host: argoDomain, 
+          path: '/vmess-argo?ed=2560', 
+          tls: 'tls', 
+          sni: argoDomain, 
+          alpn: '', 
+          fp: 'firefox'
+        };
+        
+        const subTxt = `vmess://${Buffer.from(JSON.stringify(VMESS)).toString('base64')}`;
+        
+        // 保存订阅文件
+        const encodedContent = Buffer.from(subTxt).toString('base64');
+        console.log('Generated subscription content (Argo Mode):');
+        console.log(encodedContent);
+        fs.writeFileSync(subPath, encodedContent);
+        console.log(`${FILE_PATH}/sub.txt saved successfully (Argo Mode)`);
+        
+        // 推送订阅内容
+        await pushSubscriptionContent();
+        
+        // 上传节点
+        uploadNodes();
+        
+        // 设置订阅路由
+        app.get(`/${SUB_PATH}`, (req, res) => {
+          res.set('Content-Type', 'text/plain; charset=utf-8');
+          res.send(encodedContent);
+        });
+        
+        console.log(`Argo mode configuration completed for domain: ${argoDomain}`);
+        resolve(subTxt);
+      }, 2000);
+    });
+  } catch (error) {
+    console.error('Error generating argo links:', error);
+    // 创建基本的订阅内容作为备用
+    const fallbackVMESS = {
+      v: '2',
+      ps: 'Argo-Fallback',
+      add: CFIP,
+      port: CFPORT,
+      id: UUID,
+      aid: '0',
+      scy: 'none',
+      net: 'ws',
+      type: 'none',
+      host: argoDomain,
+      path: '/vmess-argo?ed=2560',
+      tls: 'tls',
+      sni: argoDomain,
+      fp: 'firefox'
+    };
+    
+    const subTxt = `vmess://${Buffer.from(JSON.stringify(fallbackVMESS)).toString('base64')}`;
+    const encodedContent = Buffer.from(subTxt).toString('base64');
+    fs.writeFileSync(subPath, encodedContent);
+    
+    app.get(`/${SUB_PATH}`, (req, res) => {
+      res.set('Content-Type', 'text/plain; charset=utf-8');
+      res.send(encodedContent);
+    });
+    
+    return subTxt;
+  }
+}
+
+// 提取临时域名（CF Argo 临时隧道）
+async function extractTempDomains() {
+  try {
+    console.log('Looking for temporary Argo domain...');
+    
+    // 等待一段时间让 cloudflared 生成日志
+    await new Promise(resolve => setTimeout(resolve, 5000));
+    
+    if (!fs.existsSync(path.join(FILE_PATH, 'boot.log'))) {
+      console.log('boot.log file not found, waiting longer...');
+      await new Promise(resolve => setTimeout(resolve, 5000));
+    }
+    
+    if (fs.existsSync(path.join(FILE_PATH, 'boot.log'))) {
       const fileContent = fs.readFileSync(path.join(FILE_PATH, 'boot.log'), 'utf-8');
       const lines = fileContent.split('\n');
       const argoDomains = [];
+      
       lines.forEach((line) => {
+        // 匹配多种格式的临时域名
         const domainMatch = line.match(/https?:\/\/([^ ]*trycloudflare\.com)\/?/);
         if (domainMatch) {
           const domain = domainMatch[1];
           argoDomains.push(domain);
         }
+        
+        // 匹配其他可能的域名格式
+        const otherMatch = line.match(/assigned\s+to\s+([a-zA-Z0-9.-]+\.trycloudflare\.com)/);
+        if (otherMatch) {
+          argoDomains.push(otherMatch[1]);
+        }
       });
 
       if (argoDomains.length > 0) {
-        argoDomain = argoDomains[0];
-        console.log('ArgoDomain:', argoDomain);
+        const argoDomain = argoDomains[0];
+        console.log('Found ArgoDomain:', argoDomain);
         await generateLinks(argoDomain);
-      } else {
-        console.log('ArgoDomain not found, re-running bot to obtain ArgoDomain');
-        fs.unlinkSync(path.join(FILE_PATH, 'boot.log'));
-        async function killBotProcess() {
-          try {
-            if (process.platform === 'win32') {
-              await exec(`taskkill /f /im ${botName}.exe > nul 2>&1`);
-            } else {
-              await exec(`pkill -f "[${botName.charAt(0)}]${botName.substring(1)}" > /dev/null 2>&1`);
-            }
-          } catch (error) {
-            // 忽略输出
-          }
+        return;
+      }
+    }
+    
+    console.log('ArgoDomain not found in boot.log, attempting to restart cloudflared...');
+    
+    // 重启 cloudflared 进程
+    async function killBotProcess() {
+      try {
+        if (process.platform === 'win32') {
+          await exec(`taskkill /f /im ${botName}.exe > nul 2>&1`);
+        } else {
+          await exec(`pkill -f "[${botName.charAt(0)}]${botName.substring(1)}" > /dev/null 2>&1`);
         }
-        killBotProcess();
-        await new Promise((resolve) => setTimeout(resolve, 3000));
-        const args = `tunnel --edge-ip-version auto --no-autoupdate --protocol http2 --logfile ${FILE_PATH}/boot.log --loglevel info --url http://localhost:${ARGO_PORT}`;
-        try {
-          await exec(`nohup ${botPath} ${args} >/dev/null 2>&1 &`);
-          console.log(`${botName} is running`);
-          await new Promise((resolve) => setTimeout(resolve, 3000));
-          await extractDomains();
-        } catch (error) {
-          console.error(`Error executing command: ${error}`);
+        console.log('Stopped previous cloudflared process');
+      } catch (error) {
+        // 忽略错误，可能进程不存在
+      }
+    }
+    
+    await killBotProcess();
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    
+    // 重新启动 cloudflared
+    const args = `tunnel --edge-ip-version auto --no-autoupdate --protocol http2 --logfile ${FILE_PATH}/boot.log --loglevel info --url http://localhost:${ARGO_PORT}`;
+    try {
+      await exec(`nohup ${botPath} ${args} >/dev/null 2>&1 &`);
+      console.log(`${botName} restarted`);
+      await new Promise(resolve => setTimeout(resolve, 8000));
+      
+      // 再次尝试提取域名
+      if (fs.existsSync(path.join(FILE_PATH, 'boot.log'))) {
+        const fileContent = fs.readFileSync(path.join(FILE_PATH, 'boot.log'), 'utf-8');
+        const lines = fileContent.split('\n');
+        const argoDomains = [];
+        
+        lines.forEach((line) => {
+          const domainMatch = line.match(/https?:\/\/([^ ]*trycloudflare\.com)\/?/);
+          if (domainMatch) {
+            const domain = domainMatch[1];
+            argoDomains.push(domain);
+          }
+        });
+
+        if (argoDomains.length > 0) {
+          const argoDomain = argoDomains[0];
+          console.log('Found ArgoDomain after restart:', argoDomain);
+          await generateLinks(argoDomain);
+          return;
         }
       }
+      
+      console.log('Still no ArgoDomain found, using fallback method');
+      await generateLinks('fallback.trycloudflare.com');
+      
     } catch (error) {
-      console.error('Error reading boot.log:', error);
+      console.error(`Error restarting cloudflared: ${error}`);
+      await generateLinks('error.trycloudflare.com');
     }
+  } catch (error) {
+    console.error('Error extracting temporary domains:', error);
+    await generateLinks('error.trycloudflare.com');
   }
+}
 
   // 生成 list 和 sub 信息
   async function generateLinks(argoDomain) {
@@ -602,21 +902,29 @@ async function uploadNodes() {
   }
 }
 
-// 清理文件（保留komari-agent）
+// 清理文件
 function cleanFiles() {
   setTimeout(() => {
-    const filesToDelete = [bootLogPath, configPath, webPath, botPath]; // 不删除komari-agent
+    const enableCFArgo = ENABLE_CF_ARGO.toLowerCase() === 'true';
+    const filesToDelete = [bootLogPath, configPath, webPath];
+    
+    // 仅在 CF Argo 模式时清理 bot 文件
+    if (enableCFArgo) {
+      filesToDelete.push(botPath);
+    }
     
     if (process.platform === 'win32') {
       exec(`del /f /q ${filesToDelete.join(' ')} > nul 2>&1`, (error) => {
         console.clear();
         console.log('App is running');
+        console.log(`Mode: ${enableCFArgo ? 'CF Argo' : 'Direct'}`);
         console.log('Thank you for using this script, enjoy!');
       });
     } else {
       exec(`rm -rf ${filesToDelete.join(' ')} >/dev/null 2>&1`, (error) => {
         console.clear();
         console.log('App is running');
+        console.log(`Mode: ${enableCFArgo ? 'CF Argo' : 'Direct'}`);
         console.log('Thank you for using this script, enjoy!');
       });
     }
