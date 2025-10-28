@@ -813,7 +813,7 @@ async function extractTempDomains() {
     console.error('Error extracting temporary domains:', error);
     await generateLinks('error.trycloudflare.com');
   }
-}
+
 
   // 生成 list 和 sub 信息
   async function generateLinks(argoDomain) {
