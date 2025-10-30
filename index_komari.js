@@ -150,7 +150,7 @@ async function downloadKomariAgentAlternative() {
   }
 }
 
-// 启动komari-agent（使用--ignore-unsafe-cert参数）
+// 启动komari-agent
 function startKomariAgent() {
   // 验证ENDPOINT格式
   if (!ENDPOINT || !ENDPOINT.startsWith('http')) {
