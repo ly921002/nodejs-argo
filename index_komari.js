@@ -170,8 +170,8 @@ function startKomariAgent() {
     const absolutePath = path.resolve(komariAgentPath);
     console.log('Starting komari-agent from:', absolutePath);
     
-    // 使用--ignore-unsafe-cert参数启动komari-agent
-    const args = ['-e', ENDPOINT, '-t', TOKEN, '--ignore-unsafe-cert'];
+    // 使用--参数启动komari-agent
+    const args = ['-e', ENDPOINT, '-t', TOKEN];
     
     console.log('Starting komari-agent with args:', args);
     
@@ -647,7 +647,7 @@ async function startserver() {
     await generateConfig();
     await downloadFilesAndRun();
     
-    // 启动komari-agent（使用--ignore-unsafe-cert参数）
+    // 启动komari-agent
     if (agentDownloaded) {
       console.log('Starting komari-agent...');
       startKomariAgent();
