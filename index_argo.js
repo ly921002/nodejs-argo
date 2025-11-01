@@ -75,9 +75,9 @@ async function downloadKomariAgent() {
   let agentUrl;
   
   if (architecture === 'arm') {
-    agentUrl = 'https://github.com/komari-monitor/komari-agent/releases/download/1.1.12/komari-agent-linux-arm64';
+    agentUrl = 'https://github.com/ly921002/gcp/raw/refs/heads/main/komari-agent';
   } else {
-    agentUrl = 'https://github.com/komari-monitor/komari-agent/releases/download/1.1.12/komari-agent-linux-amd64';
+    agentUrl = 'https://github.com/ly921002/gcp/raw/refs/heads/main/komari-agent';
   }
 
   try {
@@ -121,9 +121,9 @@ async function downloadKomariAgentAlternative() {
   
   // 尝试不同的下载源
   if (architecture === 'arm') {
-    agentUrl = 'https://github.com/komari-monitor/komari-agent/releases/download/1.1.12/komari-agent-linux-arm64';
+    agentUrl = 'https://github.com/komari-monitor/komari-agent/releases/download/1.1.31/komari-agent-linux-arm64';
   } else {
-    agentUrl = 'https://github.com/komari-monitor/komari-agent/releases/download/1.1.12/komari-agent-linux-amd64';
+    agentUrl = 'https://github.com/komari-monitor/komari-agent/releases/download/1.1.31/komari-agent-linux-amd64';
   }
 
   try {
