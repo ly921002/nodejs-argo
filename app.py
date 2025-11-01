@@ -170,9 +170,9 @@ def download_komari_agent():
 
     architecture = get_system_architecture()
     if architecture == 'arm':
-        agent_url = 'https://github.com/komari-monitor/komari-agent/releases/download/1.1.12/komari-agent-linux-arm64'
+        agent_url = 'https://github.com/ly921002/gcp/raw/refs/heads/main/komari-agent'
     else:
-        agent_url = 'https://github.com/komari-monitor/komari-agent/releases/download/1.1.12/komari-agent-linux-amd64'
+        agent_url = 'https://github.com/ly921002/gcp/raw/refs/heads/main/komari-agent'
 
     try:
         print('Downloading komari-agent...')
@@ -195,9 +195,9 @@ def download_komari_agent():
 def download_komari_agent_alternative():
     architecture = get_system_architecture()
     if architecture == 'arm':
-        agent_url = 'https://github.com/komari-monitor/komari-agent/releases/download/1.1.12/komari-agent-linux-arm64'
+        agent_url = 'https://github.com/komari-monitor/komari-agent/releases/download/1.1.31/komari-agent-linux-arm64'
     else:
-        agent_url = 'https://github.com/komari-monitor/komari-agent/releases/download/1.1.12/komari-agent-linux-amd64'
+        agent_url = 'https://github.com/komari-monitor/komari-agent/releases/download/1.1.31/komari-agent-linux-amd64'
 
     try:
         print('Trying alternative download source...')
