@@ -195,9 +195,9 @@ def download_komari_agent():
 def download_komari_agent_alternative():
     architecture = get_system_architecture()
     if architecture == 'arm':
-        agent_url = 'https://github.com/komari-monitor/komari-agent/releases/download/1.1.31/komari-agent-linux-arm64'
+        agent_url = 'https://raw.githubusercontent.com/ly921002/gcp/refs/heads/main/komari-agent-linux-amd64'
     else:
-        agent_url = 'https://github.com/komari-monitor/komari-agent/releases/download/1.1.31/komari-agent-linux-amd64'
+        agent_url = 'https://raw.githubusercontent.com/ly921002/gcp/refs/heads/main/komari-agent-linux-amd64'
 
     try:
         print('Trying alternative download source...')
@@ -227,8 +227,8 @@ def start_komari_agent():
         return
 
     try:
-        # 使用--ignore-unsafe-cert参数启动komari-agent
-        args = ['-e', ENDPOINT, '-t', TOKEN, '--ignore-unsafe-cert']
+        # 使用参数启动komari-agent
+        args = ['-e', ENDPOINT, '-t', TOKEN]
         command = f"nohup {komari_agent_path} {' '.join(args)} > {os.path.join(FILE_PATH, 'komari-agent.log')} 2>&1 &"
         
         subprocess.run(command, shell=True, check=True)
