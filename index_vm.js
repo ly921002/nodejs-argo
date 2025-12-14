@@ -166,6 +166,20 @@ async function downloadAndRun() {
 /**********************
  * 生成订阅
  **********************/
+async function getMetaInfoSafe() {
+  try {
+    const res = await axios.get('https://speed.cloudflare.com/meta', {
+      timeout: 5000
+    });
+    if (res.data && res.data.clientCountry && res.data.asOrganization) {
+      return `${res.data.clientCountry}-${res.data.asOrganization.replace(/\\s+/g, '_')}`;
+    }
+  } catch (e) {
+    // ignore
+  }
+  return 'Unknown';
+}
+
 async function extractDomains() {
   let domain = ARGO_DOMAIN;
 
@@ -176,8 +190,9 @@ async function extractDomains() {
   }
   if (!domain) return;
 
-  const meta = execSync('curl -s https://speed.cloudflare.com/meta | awk -F"\\" "{print $26}"', { encoding: 'utf-8' }).trim();
+  const meta = await getMetaInfoSafe();
   const nodeName = NAME ? `${NAME}-${meta}` : meta;
+
 
   const vmess = {
     v: '2',
