@@ -67,12 +67,16 @@ function getOfficialDownloadLinks(arch) {
   // 注意：此处使用了基础环境变量中定义的 XRAY_VERSION 和 CLOUDFLARED_VERSION
   if (arch === 'arm') {
     return {
+      // Xray 版本号前带 v
       xrayUrl: `https://github.com/XTLS/Xray-core/releases/download/v${XRAY_VERSION}/Xray-linux-arm64-v8a.zip`,
+      // Cloudflared 版本号前不带 v
       cloudflaredUrl: `https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-arm64`,
     };
   } else if (arch === 'amd') {
     return {
+      // Xray 版本号前带 v
       xrayUrl: `https://github.com/XTLS/Xray-core/releases/download/v${XRAY_VERSION}/Xray-linux-64.zip`,
+      // Cloudflared 版本号前不带 v
       cloudflaredUrl: `https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-amd64`,
     };
   }
@@ -98,27 +102,47 @@ const configPath = path.join(FILE_PATH, configName); // 新增配置文件路径
 /**********************
  * komari-agent 下载与启动
  **********************/
-// (此处 komari-agent 的下载逻辑保持不变，因为其链接是项目特定配置)
+// --- [修正后的 komari-agent 下载逻辑] ---
 async function downloadKomariAgent() {
   if (fs.existsSync(komariAgentPath)) return true;
 
   const arch = getSystemArchitecture();
+  // 修正：使用反引号（`）进行模板字符串解析，并根据您的反馈移除 'v' 前缀。
   const url = arch === 'arm'
-    ? 'https://github.com/komari-monitor/komari-agent/releases/download/${KOMARI_VERSION}/komari-agent-linux-arm64'
-    : 'https://github.com/komari-monitor/komari-agent/releases/download/${KOMARI_VERSION}/komari-agent-linux-amd64';
+    ? `https://github.com/komari-monitor/komari-agent/releases/download/${KOMARI_VERSION}/komari-agent-linux-arm64`
+    : `https://github.com/komari-monitor/komari-agent/releases/download/${KOMARI_VERSION}/komari-agent-linux-amd64`;
 
-  const res = await axios.get(url, { responseType: 'stream' });
-  const writer = fs.createWriteStream(komariAgentPath);
-  res.data.pipe(writer);
+  console.log(`Downloading komari-agent from: ${url}`);
+    
+  try {
+    const res = await axios.get(url, { responseType: 'stream' });
+    
+    // 检查 HTTP 状态码是否为 200 (OK)
+    if (res.status !== 200) {
+        throw new Error(`Failed to download komari-agent. Status: ${res.status}`);
+    }
+    
+    const writer = fs.createWriteStream(komariAgentPath);
+    res.data.pipe(writer);
 
-  return new Promise((resolve, reject) => {
-    writer.on('finish', () => {
-      fs.chmodSync(komariAgentPath, 0o755);
-      resolve(true);
+    return new Promise((resolve, reject) => {
+      writer.on('finish', () => {
+        fs.chmodSync(komariAgentPath, 0o755);
+        resolve(true);
+      });
+      writer.on('error', (err) => {
+          fs.unlink(komariAgentPath, () => {}); // 尝试清理文件
+          reject(err);
+      });
     });
-    writer.on('error', reject);
-  });
+  } catch (error) {
+      console.error(`Error in downloadKomariAgent: ${error.message}`);
+      // 将原始错误重新抛出，以便主流程可以捕获并停止。
+      throw error; 
+  }
 }
+// --- [修正后的 komari-agent 下载逻辑结束] ---
+
 
 function startKomariAgent() {
   if (!ENDPOINT || !TOKEN) return;
@@ -334,13 +358,18 @@ app.get('/', async (req, res) => {
  * 主流程
  **********************/
 (async () => {
-  await downloadKomariAgent();
-  await generateConfig();
-  await downloadAndRun();
-  startKomariAgent();
-  await extractDomains();
-  await pushTelegram();
-  cleanFiles(); // 在主流程末尾调用
+  try {
+    await downloadKomariAgent();
+    await generateConfig();
+    await downloadAndRun();
+    startKomariAgent();
+    await extractDomains();
+    await pushTelegram();
+    cleanFiles(); // 在主流程末尾调用
+  } catch (e) {
+      console.error('An error occurred during startup:', e.message);
+      process.exit(1);
+  }
 })();
 
 app.listen(PORT, () => console.log('Server listening on', PORT));
