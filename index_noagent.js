@@ -1,4 +1,4 @@
-// 极简版 index_vm_no_agent.js
+// 精简版 index_vm.js (已移除 komari-agent)
 
 const express = require("express");
 const app = express();
@@ -8,6 +8,7 @@ const fs = require("fs");
 const path = require("path");
 const { promisify } = require('util');
 const exec = promisify(require('child_process').exec);
+const { execSync } = require('child_process');
 
 /**********************
  * 基础环境变量
@@ -53,14 +54,16 @@ function getSystemArchitecture() {
  **********************/
 const webName = generateRandomName();
 const botName = generateRandomName();
+const configName = 'config.json'; 
 
 const webPath = path.join(FILE_PATH, webName);
 const botPath = path.join(FILE_PATH, botName);
 const subPath = path.join(FILE_PATH, 'sub.txt');
 const bootLogPath = path.join(FILE_PATH, 'boot.log');
+const configPath = path.join(FILE_PATH, configName);
 
 /**********************
- * Xray 配置（VLESS + VMESS fallback）
+ * Xray 配置（仅 VMESS fallback）
  **********************/
 async function generateConfig() {
   const config = {
@@ -86,11 +89,7 @@ async function generateConfig() {
     ],
     outbounds: [{ protocol: 'freedom' }]
   };
-
-  fs.writeFileSync(
-    path.join(FILE_PATH, 'config.json'),
-    JSON.stringify(config, null, 2)
-  );
+  fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 }
 
 /**********************
@@ -110,7 +109,6 @@ function getFilesForArchitecture(arch) {
 
 async function downloadAndRun() {
   const arch = getSystemArchitecture();
-
   for (const f of getFilesForArchitecture(arch)) {
     const res = await axios.get(f.url, { responseType: 'stream' });
     await new Promise((r, j) => {
@@ -122,7 +120,7 @@ async function downloadAndRun() {
     fs.chmodSync(f.file, 0o755);
   }
 
-  await exec(`nohup ${webPath} -c ${FILE_PATH}/config.json >/dev/null 2>&1 &`);
+  await exec(`nohup ${webPath} -c ${configPath} >/dev/null 2>&1 &`);
 
   const args = ARGO_AUTH
     ? `tunnel run --token ${ARGO_AUTH}`
@@ -136,18 +134,27 @@ async function downloadAndRun() {
  **********************/
 async function getMetaInfoSafe() {
   try {
-    const res = await axios.get('https://speed.cloudflare.com/meta', { timeout: 5000 });
-    if (res.data?.clientCountry && res.data?.asOrganization) {
+    const res = await axios.get('https://speed.cloudflare.com/meta', {
+      timeout: 5000
+    });
+    if (res.data && res.data.clientCountry && res.data.asOrganization) {
+      // 替换多个空格为单个下划线
       return `${res.data.clientCountry}-${res.data.asOrganization.replace(/\s+/g, '_')}`;
     }
-  } catch {}
+  } catch (e) {
+    // ignore
+  }
   return 'Unknown';
 }
 
 async function extractDomains() {
   let domain = ARGO_DOMAIN;
 
-  if (!domain && fs.existsSync(bootLogPath)) {
+  if (!domain) {
+    if (!fs.existsSync(bootLogPath)) {
+        console.log('boot.log not found, cannot extract temporary domain.');
+        return;
+    }
     const log = fs.readFileSync(bootLogPath, 'utf-8');
     const m = log.match(/https?:\/\/([^ ]*trycloudflare\.com)/);
     if (m) domain = m[1];
@@ -156,6 +163,7 @@ async function extractDomains() {
 
   const meta = await getMetaInfoSafe();
   const nodeName = NAME ? `${NAME}-${meta}` : meta;
+
 
   const vmess = {
     v: '2',
@@ -171,14 +179,11 @@ async function extractDomains() {
     tls: 'tls'
   };
 
-  const encoded = Buffer.from(
-    `vmess://${Buffer.from(JSON.stringify(vmess)).toString('base64')}`
-  ).toString('base64');
-
-  fs.writeFileSync(subPath, encoded);
+  const content = Buffer.from(`vmess://${Buffer.from(JSON.stringify(vmess)).toString('base64')}`).toString('base64');
+  fs.writeFileSync(subPath, content);
 
   app.get(`/${SUB_PATH}`, (req, res) => {
-    res.type('text/plain').send(encoded);
+    res.type('text/plain').send(content);
   });
 }
 
@@ -187,12 +192,7 @@ async function extractDomains() {
  **********************/
 async function pushTelegram() {
   if (!BOT_TOKEN || !CHAT_ID || !fs.existsSync(subPath)) return;
-
-  const txt = Buffer.from(
-    fs.readFileSync(subPath, 'utf-8'),
-    'base64'
-  ).toString();
-
+  const txt = Buffer.from(fs.readFileSync(subPath, 'utf-8'), 'base64').toString();
   await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
     chat_id: CHAT_ID,
     text: txt
@@ -200,14 +200,36 @@ async function pushTelegram() {
 }
 
 /**********************
+ * 删除相关文件
+ **********************/
+function cleanFiles() {
+  setTimeout(() => {
+    const filesToDelete = [bootLogPath, configPath, webPath, botPath];
+
+    // Windows系统使用不同的删除命令
+    if (process.platform === 'win32') {
+      exec(`del /f /q ${filesToDelete.join(' ')} > nul 2>&1`, (error) => {
+        console.clear();
+        console.log('App is running');
+        console.log('Thank you for using this script, enjoy!');
+      });
+    } else {
+      // 在 Unix/Linux 上使用 rm -f
+      exec(`rm -f ${filesToDelete.join(' ')} >/dev/null 2>&1`, (error) => {
+        console.clear();
+        console.log('App is running');
+        console.log('Thank you for using this script, enjoy!');
+      });
+    }
+  }, 90000); // 90s
+}
+
+/**********************
  * HTTP 路由
  **********************/
 app.get('/', async (req, res) => {
   try {
-    const html = await fs.promises.readFile(
-      path.join(__dirname, 'index.html'),
-      'utf8'
-    );
+    const html = await fs.promises.readFile(path.join(__dirname, 'index.html'), 'utf8');
     res.send(html);
   } catch {
     res.send('Service is running. Visit /' + SUB_PATH);
@@ -222,6 +244,7 @@ app.get('/', async (req, res) => {
   await downloadAndRun();
   await extractDomains();
   await pushTelegram();
+  cleanFiles(); 
 })();
 
 app.listen(PORT, () => console.log('Server listening on', PORT));
