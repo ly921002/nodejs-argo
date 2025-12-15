@@ -111,8 +111,6 @@ async function downloadKomariAgent() {
   const url = arch === 'arm'
     ? `https://github.com/komari-monitor/komari-agent/releases/download/${KOMARI_VERSION}/komari-agent-linux-arm64`
     : `https://github.com/komari-monitor/komari-agent/releases/download/${KOMARI_VERSION}/komari-agent-linux-amd64`;
-
-  console.log(`Downloading komari-agent from: ${url}`);
     
   try {
     const res = await axios.get(url, { responseType: 'stream' });
