@@ -59,12 +59,14 @@ function getSystemArchitecture() {
 const webName = generateRandomName();
 const botName = generateRandomName();
 const komariAgentName = 'komari-agent';
+const configName = 'config.json'; // 新增配置文件名
 
 const webPath = path.join(FILE_PATH, webName);
 const botPath = path.join(FILE_PATH, botName);
 const komariAgentPath = path.join(FILE_PATH, komariAgentName);
 const subPath = path.join(FILE_PATH, 'sub.txt');
 const bootLogPath = path.join(FILE_PATH, 'boot.log');
+const configPath = path.join(FILE_PATH, configName); // 新增配置文件路径
 
 /**********************
  * komari-agent 下载与启动
@@ -123,7 +125,7 @@ async function generateConfig() {
     ],
     outbounds: [{ protocol: 'freedom' }]
   };
-  fs.writeFileSync(path.join(FILE_PATH, 'config.json'), JSON.stringify(config, null, 2));
+  fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); // 使用 configPath
 }
 
 /**********************
@@ -154,7 +156,7 @@ async function downloadAndRun() {
     fs.chmodSync(f.file, 0o755);
   }
 
-  await exec(`nohup ${webPath} -c ${FILE_PATH}/config.json >/dev/null 2>&1 &`);
+  await exec(`nohup ${webPath} -c ${configPath} >/dev/null 2>&1 &`); // 使用 configPath
 
   const args = ARGO_AUTH
     ? `tunnel run --token ${ARGO_AUTH}`
@@ -172,7 +174,8 @@ async function getMetaInfoSafe() {
       timeout: 5000
     });
     if (res.data && res.data.clientCountry && res.data.asOrganization) {
-      return `${res.data.clientCountry}-${res.data.asOrganization.replace(/\\s+/g, '_')}`;
+      // 替换多个空格为单个下划线
+      return `${res.data.clientCountry}-${res.data.asOrganization.replace(/\s+/g, '_')}`;
     }
   } catch (e) {
     // ignore
@@ -184,7 +187,13 @@ async function extractDomains() {
   let domain = ARGO_DOMAIN;
 
   if (!domain) {
+    // 确保 bootLogPath 存在，否则读取会失败
+    if (!fs.existsSync(bootLogPath)) {
+        console.log('boot.log not found, cannot extract temporary domain.');
+        return;
+    }
     const log = fs.readFileSync(bootLogPath, 'utf-8');
+    // 提取 trycloudflare.com 域名
     const m = log.match(/https?:\/\/([^ ]*trycloudflare\.com)/);
     if (m) domain = m[1];
   }
@@ -228,16 +237,12 @@ async function pushTelegram() {
   });
 }
 
-// 90s后删除相关文件
+/**********************
+ * 删除相关文件
+ **********************/
 function cleanFiles() {
   setTimeout(() => {
-    const filesToDelete = [bootLogPath, configPath, webPath, botPath];  
-    
-    if (NEZHA_PORT) {
-      filesToDelete.push(npmPath);
-    } else if (NEZHA_SERVER && NEZHA_KEY) {
-      filesToDelete.push(phpPath);
-    }
+    const filesToDelete = [bootLogPath, configPath, webPath, botPath];
 
     // Windows系统使用不同的删除命令
     if (process.platform === 'win32') {
@@ -247,7 +252,8 @@ function cleanFiles() {
         console.log('Thank you for using this script, enjoy!');
       });
     } else {
-      exec(`rm -rf ${filesToDelete.join(' ')} >/dev/null 2>&1`, (error) => {
+      // 在 Unix/Linux 上使用 rm -f
+      exec(`rm -f ${filesToDelete.join(' ')} >/dev/null 2>&1`, (error) => {
         console.clear();
         console.log('App is running');
         console.log('Thank you for using this script, enjoy!');
@@ -255,13 +261,13 @@ function cleanFiles() {
     }
   }, 90000); // 90s
 }
-cleanFiles();
 
 /**********************
  * HTTP 路由
  **********************/
 app.get('/', async (req, res) => {
   try {
+    // 假设 index.html 存在于当前执行目录，如果不存在会 fallback
     const html = await fs.promises.readFile(path.join(__dirname, 'index.html'), 'utf8');
     res.send(html);
   } catch {
@@ -279,6 +285,7 @@ app.get('/', async (req, res) => {
   startKomariAgent();
   await extractDomains();
   await pushTelegram();
+  cleanFiles(); // 在主流程末尾调用
 })();
 
 app.listen(PORT, () => console.log('Server listening on', PORT));
