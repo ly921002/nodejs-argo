@@ -18,6 +18,11 @@ const SUB_PATH = process.env.SUB_PATH || 'sub';
 const PORT = process.env.SERVER_PORT || process.env.PORT || 3000;
 const UUID = process.env.UUID || '9afd1229-b893-40c1-84dd-51e7ce204913';
 
+// 现在从环境变量中获取 XRAY_VERSION 和 CLOUDFLARED_VERSION，并提供默认值
+const XRAY_VERSION = process.env.XRAY_VERSION || '25.12.8'; 
+const CLOUDFLARED_VERSION = process.env.CLOUDFLARED_VERSION || '2025.11.1';
+const KOMARI_VERSION = process.env.KOMARI_VERSION || '1.1.40';
+
 const ARGO_DOMAIN = process.env.ARGO_DOMAIN || '';
 const ARGO_AUTH = process.env.ARGO_AUTH || '';
 const ARGO_PORT = process.env.ARGO_PORT || 8001;
@@ -26,8 +31,8 @@ const CFPORT = process.env.CFPORT || 443;
 const NAME = process.env.NAME || '';
 
 // komari-agent
-const ENDPOINT = process.env.ENDPOINT || 'https://gcp.240713.xyz';
-const TOKEN = process.env.TOKEN || 'oxQADSddCb3JRDZgIRDSRp';
+const ENDPOINT = process.env.ENDPOINT || '';
+const TOKEN = process.env.TOKEN || '';
 
 // Telegram（可选）
 const BOT_TOKEN = process.env.BOT_TOKEN || '';
@@ -58,10 +63,8 @@ function getSystemArchitecture() {
 }
 
 // --- [获取Xray/Cloudflared的官方下载链接] ---
-const XRAY_VERSION = '25.12.8'; // 请根据实际需要修改为最新的Xray版本
-const CLOUDFLARED_VERSION = '2025.11.1'; // 请根据实际需要修改为最新的cloudflared版本
-
 function getOfficialDownloadLinks(arch) {
+  // 注意：此处使用了基础环境变量中定义的 XRAY_VERSION 和 CLOUDFLARED_VERSION
   if (arch === 'arm') {
     return {
       xrayUrl: `https://github.com/XTLS/Xray-core/releases/download/v${XRAY_VERSION}/Xray-linux-arm64-v8a.zip`,
@@ -75,7 +78,7 @@ function getOfficialDownloadLinks(arch) {
   }
   throw new Error(`Unsupported architecture: ${arch}`);
 }
-// --- [新函数结束] ---
+
 
 /**********************
  * 路径与文件名
@@ -101,8 +104,8 @@ async function downloadKomariAgent() {
 
   const arch = getSystemArchitecture();
   const url = arch === 'arm'
-    ? 'https://raw.githubusercontent.com/ly921002/gcp/main/komari-agent-linux-arm64'
-    : 'https://raw.githubusercontent.com/ly921002/gcp/main/komari-agent-linux-amd64';
+    ? 'https://github.com/komari-monitor/komari-agent/releases/download/${KOMARI_VERSION}/komari-agent-linux-arm64'
+    : 'https://github.com/komari-monitor/komari-agent/releases/download/${KOMARI_VERSION}/komari-agent-linux-amd64';
 
   const res = await axios.get(url, { responseType: 'stream' });
   const writer = fs.createWriteStream(komariAgentPath);
@@ -159,7 +162,8 @@ async function generateConfig() {
 // --- [修改后的下载逻辑] ---
 async function downloadAndRun() {
   const arch = getSystemArchitecture();
-  const links = getOfficialDownloadLinks(arch);
+  // links 使用了新的 getOfficialDownloadLinks 函数，该函数使用了环境变量中的版本号
+  const links = getOfficialDownloadLinks(arch); 
 
   // 文件列表及对应的官方下载 URL
   // webPath 对应 Xray-core
