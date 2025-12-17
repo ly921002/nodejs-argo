@@ -260,8 +260,7 @@ async function buildSub(domain) {
     const cloudflaredPath = path.join(FILE_PATH, cloudflaredName);
     
     const configPath = path.join(FILE_PATH, 'config.json');
-    const cfLog = path.join(FILE_PATH, 'cloudflared.log');
-
+    
     const tasks = [
       () => downloadXray(xrayPath),
       () => downloadCloudflared(cloudflaredPath)
@@ -289,7 +288,7 @@ async function buildSub(domain) {
       configPath
     ], 60000);
 
-    const domain = ARGO_DOMAIN || await waitForDomain(cfLog);
+    const domain = ARGO_DOMAIN;
     const sub = await buildSub(domain);
 
     state.ready = true;
