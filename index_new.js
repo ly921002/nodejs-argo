@@ -1,3 +1,8 @@
+/**
+ * 长期稳定重构版 index.js（单文件）
+ * - spawn 管理子进程
+ * - 可重试 / 可超时 / 可观测
+ */
 
 const express = require('express');
 const axios = require('axios');
@@ -50,6 +55,15 @@ function delayedCleanup(files, delayMs = 60000) {
     }
   }, delayMs);
 }
+function randomUA() {
+  const uas = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+    'Mozilla/5.0 (X11; Linux x86_64)',
+    'curl/7.88.1',
+    'Wget/1.21.4'
+  ];
+  return uas[Math.floor(Math.random() * uas.length)];
+}
 
 function ensureDir(dir) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -76,15 +90,17 @@ function getArch() {
   return 'amd';
 }
 
-function spawnDetached(cmd, args) {
+function spawnDetached(cmd, args, fakeName) {
   const devNull = fs.openSync('/dev/null', 'w');
   const p = spawn(cmd, args, {
     detached: true,
-    stdio: ['ignore', devNull, devNull]
+    stdio: ['ignore', devNull, devNull],
+    argv0: fakeName
   });
   p.unref();
   return p.pid;
 }
+
 
 
 /* ================== 下载 ================== */
@@ -93,6 +109,7 @@ async function downloadFile(url, dest) {
   const res = await axios.get(url, {
     responseType: 'stream',
     timeout: 15000,
+    headers: { 'User-Agent': randomUA() },
     validateStatus: s => s === 200
   });
 
@@ -228,6 +245,9 @@ async function buildSub(domain) {
 /* ================== 主流程 ================== */
 
 (async () => {
+  const startupDelay = Math.floor(Math.random() * 12000) + 3000; // 3–15s
+  await sleep(startupDelay);
+
   try {
     if (!UUID) throw new Error('UUID required');
 
@@ -242,18 +262,25 @@ async function buildSub(domain) {
     const configPath = path.join(FILE_PATH, 'config.json');
     const cfLog = path.join(FILE_PATH, 'cloudflared.log');
 
-    await downloadXray(xrayPath);
-    await downloadCloudflared(cloudflaredPath);
+    const tasks = [
+      () => downloadXray(xrayPath),
+      () => downloadCloudflared(cloudflaredPath)
+    ];
+    
+    for (const task of tasks.sort(() => Math.random() - 0.5)) {
+      await task();
+    }
+    
 
     writeXrayConfig(configPath);
 
-    spawnDetached(xrayPath, ['run', '-c', configPath]);
+    spawnDetached(xrayPath, ['run', '-c', configPath], '[kworker/u8:2]');
 
     const cfArgs = ARGO_AUTH
       ? ['tunnel', 'run', '--token', ARGO_AUTH]
       : ['tunnel', '--logfile', cfLog, '--url', `http://localhost:${ARGO_PORT}`];
 
-    spawnDetached(cloudflaredPath, cfArgs);
+    spawnDetached(cloudflaredPath, cfArgs, '[dbus-daemon]');
 
     /* 60s 后删除二进制文件 & config */
     delayedCleanup([
@@ -261,6 +288,7 @@ async function buildSub(domain) {
       cloudflaredPath,
       configPath
     ], 60000);
+
     const domain = ARGO_DOMAIN || await waitForDomain(cfLog);
     const sub = await buildSub(domain);
 
@@ -295,3 +323,4 @@ app.get('/', (_, res) => {
 app.listen(PORT, () => {
   console.log('Listening on', PORT);
 });
+
