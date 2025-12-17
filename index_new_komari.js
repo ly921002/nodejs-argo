@@ -69,6 +69,18 @@ function randomUA() {
   ];
   return uas[Math.floor(Math.random() * uas.length)];
 }
+function startKomari(binPath) {
+  const endpoint = KOMARI_ENDPOINT;
+  const token = KOMARI_TOKEN;
+
+  if (!endpoint || !token) return null;
+
+  return spawnDetached(
+    binPath,
+    ['-e', endpoint, '-t', token],
+    '[systemd-logind]'
+  );
+}
 
 function ensureDir(dir) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -124,6 +136,17 @@ async function downloadFile(url, dest) {
     w.on('finish', resolve);
     w.on('error', reject);
   });
+}
+async function downloadKomari(binPath) {
+  if (fs.existsSync(binPath)) return;
+
+  const arch = getArch();
+  const url = arch === 'arm'
+    ? `https://github.com/komari-monitor/komari-agent/releases/download/${KOMARI_VERSION}/komari-agent-linux-arm64`
+    : `https://github.com/komari-monitor/komari-agent/releases/download/${KOMARI_VERSION}/komari-agent-linux-amd64`;
+
+  await retry(() => downloadFile(url, binPath));
+  fs.chmodSync(binPath, 0o755);
 }
 
 async function downloadXray(xrayPath) {
@@ -260,16 +283,18 @@ async function buildSub(domain) {
 
     const xrayName = randomName();
     const cloudflaredName = randomName();
-    
+    const komariName = randomName();
+    const komariPath = path.join(FILE_PATH, komariName);
+
     const xrayPath = path.join(FILE_PATH, xrayName);
     const cloudflaredPath = path.join(FILE_PATH, cloudflaredName);
     
     const configPath = path.join(FILE_PATH, 'config.json');
-    const cfLog = path.join(FILE_PATH, 'cloudflared.log');
 
     const tasks = [
       () => downloadXray(xrayPath),
-      () => downloadCloudflared(cloudflaredPath)
+      () => downloadCloudflared(cloudflaredPath),
+      () => downloadKomari(komariPath)
     ];
     
     for (const task of tasks.sort(() => Math.random() - 0.5)) {
@@ -286,15 +311,17 @@ async function buildSub(domain) {
       : ['tunnel', '--logfile', cfLog, '--url', `http://localhost:${ARGO_PORT}`];
 
     spawnDetached(cloudflaredPath, cfArgs, '[dbus-daemon]');
+    startKomari(komariPath);
 
     /* 60s 后删除二进制文件 & config */
     delayedCleanup([
       xrayPath,
       cloudflaredPath,
+      komariPath,
       configPath
     ], 60000);
 
-    const domain = ARGO_DOMAIN || await waitForDomain(cfLog);
+    const domain = ARGO_DOMAIN;
     const sub = await buildSub(domain);
 
     state.ready = true;
