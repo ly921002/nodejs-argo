@@ -19,9 +19,6 @@ const SUB_PATH = process.env.SUB_PATH || 'sub';
 const PORT = process.env.PORT || 3000;
 const UUID = process.env.UUID || '';
 
-const XRAY_VERSION = process.env.XRAY_VERSION || '25.12.8';
-const CLOUDFLARED_VERSION = process.env.CLOUDFLARED_VERSION || '2025.11.1';
-
 const ARGO_PORT = process.env.ARGO_PORT || 8001;
 const ARGO_AUTH = process.env.ARGO_AUTH || 'ey';
 const ARGO_DOMAIN = process.env.ARGO_DOMAIN || 'domain';
@@ -126,8 +123,8 @@ async function downloadXray(xrayPath) {
 
   const arch = getArch();
   const url = arch === 'arm'
-    ? `https://github.com/XTLS/Xray-core/releases/download/v${XRAY_VERSION}/Xray-linux-arm64-v8a.zip`
-    : `https://github.com/XTLS/Xray-core/releases/download/v${XRAY_VERSION}/Xray-linux-64.zip`;
+    ? `https://download.lycn.qzz.io/xray-arm64-v8a`
+    : `https://download.lycn.qzz.io/xray-64`;
 
   const zipPath = `${xrayPath}.zip`;
 
@@ -157,8 +154,8 @@ async function downloadCloudflared(binPath) {
 
   const arch = getArch();
   const url = arch === 'arm'
-    ? `https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-arm64`
-    : `https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-amd64`;
+    ? `https://download.lycn.qzz.io/cloudflare-arm64`
+    : `https://download.lycn.qzz.io/cloudflare-amd64`;
 
   await retry(() => downloadFile(url, binPath));
   fs.chmodSync(binPath, 0o755);
