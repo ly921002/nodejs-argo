@@ -144,8 +144,8 @@ async function downloadXray(xrayPath) {
   const arch = getArch();
 
   const fileName = arch === 'arm'
-    ? `Xray-linux-arm64-v8a`
-    : `Xray-linux-64`;
+    ? `xray-linux-arm64-v8a`
+    : `xray-linux-64`;
   
   const official = `https://github.com/XTLS/Xray-core/releases/download/v${XRAY_VERSION}/${fileName}.zip`;
   const mirror = `https://download.lycn.qzz.io/${fileName}`;
