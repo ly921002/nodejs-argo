@@ -1,0 +1,255 @@
+import os
+import time
+import json
+import base64
+import random
+import string
+import shutil
+import zipfile
+import subprocess
+import threading
+import requests
+from flask import Flask, jsonify, Response, send_from_directory
+# ================== 配置 ==================
+
+FILE_PATH = os.getenv("FILE_PATH", "./tmp")
+SUB_PATH = os.getenv("SUB_PATH", "sub")
+PORT = int(os.getenv("PORT", 3000))
+UUID = os.getenv("UUID", "")
+
+ARGO_PORT = int(os.getenv("ARGO_PORT", 8001))
+ARGO_AUTH = os.getenv("ARGO_AUTH", "ey")
+ARGO_DOMAIN = os.getenv("ARGO_DOMAIN", "domain")
+
+CFIP = os.getenv("CFIP", "cdns.doon.eu.org")
+CFPORT = int(os.getenv("CFPORT", 443))
+NAME = os.getenv("NAME", "")
+
+KOMARI_ENDPOINT = os.getenv("KOMARI_ENDPOINT", "")
+KOMARI_TOKEN = os.getenv("KOMARI_TOKEN", "")
+
+XRAY_VERSION = os.getenv("XRAY_VERSION", "25.12.8")
+CLOUDFLARED_VERSION = os.getenv("CLOUDFLARED_VERSION", "2025.11.1")
+KOMARI_VERSION = os.getenv("KOMARI_VERSION", "1.1.40")
+
+
+state = {
+    "ready": False,
+    "sub": "",
+    "domain": "",
+    "error": ""
+}
+
+# ================== 工具 ==================
+def rand_name(n=6):
+    return ''.join(random.choice(string.ascii_lowercase) for _ in range(n))
+
+def ensure_dir(p):
+    os.makedirs(p, exist_ok=True)
+
+def arch():
+    return "arm" if "arm" in os.uname().machine else "amd"
+
+def run_detached(cmd):
+    subprocess.Popen(
+        cmd,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        stdin=subprocess.DEVNULL,
+        preexec_fn=os.setsid
+    )
+
+def download(url, path):
+    r = requests.get(url, timeout=15, stream=True, headers={
+        "User-Agent": random.choice([
+            "curl/7.88.1", "Wget/1.21.4",
+            "Mozilla/5.0"
+        ])
+    })
+    r.raise_for_status()
+    with open(path, "wb") as f:
+        for c in r.iter_content(8192):
+            f.write(c)
+
+def download_fallback(urls, dest):
+    for u in urls:
+        try:
+            download(u, dest)
+            return
+        except:
+            if os.path.exists(dest):
+                os.remove(dest)
+    raise RuntimeError("all download failed")
+
+# ================== 下载组件 ==================
+
+def download_xray(path):
+    if os.path.exists(path): return
+    a = arch()
+    name = "xray-linux-arm64-v8a" if a == "arm" else "xray-linux-64"
+    zipf = path + ".zip"
+    urls = [
+        f"https://download.lycn.qzz.io/{name}",
+        f"https://github.com/XTLS/Xray-core/releases/download/v{XRAY_VERSION}/{name}.zip"
+    ]
+    download_fallback(urls, zipf)
+    with zipfile.ZipFile(zipf) as z:
+        z.extract("xray", FILE_PATH)
+    os.rename(os.path.join(FILE_PATH, "xray"), path)
+    os.chmod(path, 0o755)
+    os.remove(zipf)
+
+def download_cloudflared(path):
+    if os.path.exists(path): return
+    a = arch()
+    name = "cloudflared-linux-arm64" if a == "arm" else "cloudflared-linux-amd64"
+    urls = [
+        f"https://download.lycn.qzz.io/{name}",
+        f"https://github.com/cloudflare/cloudflared/releases/download/{CLOUDFLARED_VERSION}/{name}"
+    ]
+    download_fallback(urls, path)
+    os.chmod(path, 0o755)
+
+def download_komari(path):
+    if os.path.exists(path): return
+    a = arch()
+    name = "komari-agent-linux-arm64" if a == "arm" else "komari-agent-linux-amd64"
+    urls = [
+        f"https://download.lycn.qzz.io/{name}",
+        f"https://github.com/komari-monitor/komari-agent/releases/download/{KOMARI_VERSION}/{name}"
+    ]
+    download_fallback(urls, path)
+    os.chmod(path, 0o755)
+
+# ================== Xray ==================
+
+def write_xray_conf(p):
+    conf = {
+        "log": {"loglevel": "none"},
+        "inbounds": [
+            {
+                "port": ARGO_PORT,
+                "protocol": "vless",
+                "settings": {
+                    "clients": [{"id": UUID}],
+                    "decryption": "none",
+                    "fallbacks": [{"path": "/vmess-argo", "dest": 3003}]
+                }
+            },
+            {
+                "port": 3003,
+                "listen": "127.0.0.1",
+                "protocol": "vmess",
+                "settings": {"clients": [{"id": UUID, "alterId": 0}]},
+                "streamSettings": {
+                    "network": "ws",
+                    "wsSettings": {"path": "/vmess-argo"}
+                }
+            }
+        ],
+        "outbounds": [{"protocol": "freedom"}]
+    }
+    with open(p, "w") as f:
+        json.dump(conf, f)
+
+# ================== 订阅 ==================
+
+def build_sub(domain):
+    meta = "Unknown"
+    try:
+        r = requests.get("https://speed.cloudflare.com/meta", timeout=5).json()
+        meta = f"{r['clientCountry']}-{r['asOrganization'].replace(' ', '_')}"
+    except:
+        pass
+
+    ps = f"{NAME}-{meta}" if NAME else meta
+
+    vmess = {
+        "v": "2",
+        "ps": ps,
+        "add": CFIP,
+        "port": CFPORT,
+        "id": UUID,
+        "aid": "0",
+        "net": "ws",
+        "type": "none",
+        "host": domain,
+        "path": "/vmess-argo",
+        "tls": "tls"
+    }
+
+    s = "vmess://" + base64.b64encode(
+        json.dumps(vmess).encode()
+    ).decode()
+
+    return base64.b64encode(s.encode()).decode()
+
+# ================== 启动流程 ==================
+
+def startup():
+    try:
+        if not UUID:
+            raise RuntimeError("UUID required")
+
+        time.sleep(random.randint(3, 15))
+        ensure_dir(FILE_PATH)
+
+        #xray = os.path.join(FILE_PATH, rand_name())
+        #cf = os.path.join(FILE_PATH, rand_name())
+        #komari = os.path.join(FILE_PATH, rand_name())
+        xray = os.path.join(FILE_PATH, "xray")
+        cf = os.path.join(FILE_PATH, "cloudflared")
+        komari = os.path.join(FILE_PATH, "komari")
+        conf = os.path.join(FILE_PATH, "config.json")
+
+        for fn in random.sample([
+            lambda: download_xray(xray),
+            lambda: download_cloudflared(cf),
+            lambda: download_komari(komari)
+        ], 3):
+            fn()
+
+        write_xray_conf(conf)
+
+        run_detached([xray, "run", "-c", conf])
+
+        if ARGO_AUTH:
+            run_detached([cf, "tunnel", "run", "--token", ARGO_AUTH])
+        else:
+            run_detached([cf, "tunnel", "--url", f"http://localhost:{ARGO_PORT}"])
+
+        if KOMARI_ENDPOINT and KOMARI_TOKEN:
+            run_detached([komari, "-e", KOMARI_ENDPOINT, "-t", KOMARI_TOKEN])
+        
+        state["domain"] = ARGO_DOMAIN
+        state["sub"] = build_sub(ARGO_DOMAIN)
+        state["ready"] = True
+
+    except Exception as e:
+        state["error"] = str(e)
+
+threading.Thread(target=startup, daemon=True).start()
+
+# ================== HTTP ==================
+
+app = Flask(__name__)
+
+@app.route("/")
+def index():
+    # 尝试返回 index.html，模拟正常网页
+    if os.path.exists("index.html"):
+        return send_from_directory('.', 'index.html')
+    return "Service is running."
+
+@app.route("/health")
+def health():
+    return jsonify(state)
+
+@app.route(f"/{SUB_PATH}")
+def sub(): 
+    if not state["ready"]:
+        return Response("Not ready", 503)
+    return Response(state["sub"], mimetype="text/plain")
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=PORT)
