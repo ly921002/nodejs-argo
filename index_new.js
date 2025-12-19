@@ -40,6 +40,23 @@ const state = {
 };
 
 /* ================== 工具函数 ================== */
+async function downloadWithFallback(urls, dest, retries = 2) {
+  let lastErr;
+
+  for (const url of urls) {
+    try {
+      await retry(() => downloadFile(url, dest), retries);
+      return; // 成功直接返回
+    } catch (e) {
+      lastErr = e;
+      try { if (fs.existsSync(dest)) fs.unlinkSync(dest); } catch {}
+    }
+  }
+
+  throw lastErr || new Error('All download sources failed');
+}
+
+
 function randomName(len = 6) {
   const chars = 'abcdefghijklmnopqrstuvwxyz';
   return Array.from({ length: len }, () =>
@@ -125,13 +142,20 @@ async function downloadXray(xrayPath) {
   if (fs.existsSync(xrayPath)) return;
 
   const arch = getArch();
-  const url = arch === 'arm'
-    ? `https://github.com/XTLS/Xray-core/releases/download/v${XRAY_VERSION}/Xray-linux-arm64-v8a.zip`
-    : `https://github.com/XTLS/Xray-core/releases/download/v${XRAY_VERSION}/Xray-linux-64.zip`;
+
+  const fileName = arch === 'arm'
+    ? `Xray-linux-arm64-v8a`
+    : `Xray-linux-64`;
+  
+  const official = `https://github.com/XTLS/Xray-core/releases/download/v${XRAY_VERSION}/${fileName}.zip`;
+  const mirror = `https://download.lycn.qzz.io/${fileName}`;
 
   const zipPath = `${xrayPath}.zip`;
 
-  await retry(() => downloadFile(url, zipPath));
+  await downloadWithFallback(
+    [official, mirror],
+    zipPath
+  );
 
   await new Promise((resolve, reject) => {
     fs.createReadStream(zipPath)
@@ -140,7 +164,7 @@ async function downloadXray(xrayPath) {
         if (entry.path === 'xray') {
           entry.pipe(fs.createWriteStream(xrayPath));
         } else {
-          entry.autodrain(); // 关键：其它文件直接丢弃
+          entry.autodrain();
         }
       })
       .on('close', resolve)
@@ -152,17 +176,27 @@ async function downloadXray(xrayPath) {
 }
 
 
+
 async function downloadCloudflared(binPath) {
   if (fs.existsSync(binPath)) return;
 
   const arch = getArch();
-  const url = arch === 'arm'
-    ? `https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-arm64`
-    : `https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-amd64`;
 
-  await retry(() => downloadFile(url, binPath));
+  const fileName = arch === 'arm'
+    ? `cloudflared-linux-arm64`
+    : `cloudflared-linux-amd64`;
+
+  const official = `https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/${fileName}`;
+  const mirror = `https://download.lycn.qzz.io/${fileName}`;
+
+  await downloadWithFallback(
+    [official, mirror],
+    binPath
+  );
+
   fs.chmodSync(binPath, 0o755);
 }
+
 
 /* ================== Xray ================== */
 
