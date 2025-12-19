@@ -165,7 +165,7 @@ async function downloadKomari(binPath) {
   const mirror = `https://download.lycn.qzz.io/${fileName}`;
 
   await downloadWithFallback(
-    [official, mirror],
+    [mirror, official],
     binPath
   );
 
@@ -187,7 +187,7 @@ async function downloadXray(xrayPath) {
   const zipPath = `${xrayPath}.zip`;
 
   await downloadWithFallback(
-    [official, mirror],
+    [mirror, official],
     zipPath
   );
 
@@ -223,7 +223,7 @@ async function downloadCloudflared(binPath) {
   const mirror = `https://download.lycn.qzz.io/${fileName}`;
 
   await downloadWithFallback(
-    [official, mirror],
+    [mirror, official],
     binPath
   );
 
