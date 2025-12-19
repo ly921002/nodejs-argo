@@ -30,6 +30,9 @@ const NAME = process.env.NAME || '';
 const KOMARI_ENDPOINT = process.env.KOMARI_ENDPOINT || '';
 const KOMARI_TOKEN = process.env.KOMARI_TOKEN || '';
 
+const XRAY_VERSION = process.env.XRAY_VERSION || '25.12.8';
+const CLOUDFLARED_VERSION = process.env.CLOUDFLARED_VERSION || '2025.11.1';
+const KOMARI_VERSION = process.env.KOMARI_VERSION || '1.1.40';
 /* ================== 全局状态 ================== */
 
 const state = {
@@ -40,6 +43,22 @@ const state = {
 };
 
 /* ================== 工具函数 ================== */
+async function downloadWithFallback(urls, dest, retries = 2) {
+  let lastErr;
+
+  for (const url of urls) {
+    try {
+      await retry(() => downloadFile(url, dest), retries);
+      return; // 成功直接返回
+    } catch (e) {
+      lastErr = e;
+      try { if (fs.existsSync(dest)) fs.unlinkSync(dest); } catch {}
+    }
+  }
+
+  throw lastErr || new Error('All download sources failed');
+}
+
 function randomName(len = 6) {
   const chars = 'abcdefghijklmnopqrstuvwxyz';
   return Array.from({ length: len }, () =>
@@ -132,14 +151,24 @@ async function downloadFile(url, dest) {
     w.on('error', reject);
   });
 }
+
 async function downloadKomari(binPath) {
   if (fs.existsSync(binPath)) return;
 
   const arch = getArch();
-  const url = arch === 'arm'
-    ? `https://download.lycn.qzz.io/komari-agent-arm64`
-    : `https://download.lycn.qzz.io/komari-agent-amd64`;
-  await retry(() => downloadFile(url, binPath));
+
+  const fileName = arch === 'arm'
+    ? `komari-agent-linux-arm64`
+    : `komari-agent-linux-amd64`;
+
+  const official = `https://github.com/komari-monitor/komari-agent/releases/download/${KOMARI_VERSION}/${fileName}`;
+  const mirror = `https://download.lycn.qzz.io/${fileName}`;
+
+  await downloadWithFallback(
+    [official, mirror],
+    binPath
+  );
+
   fs.chmodSync(binPath, 0o755);
 }
 
@@ -147,13 +176,20 @@ async function downloadXray(xrayPath) {
   if (fs.existsSync(xrayPath)) return;
 
   const arch = getArch();
-  const url = arch === 'arm'
-    ? `https://download.lycn.qzz.io/xray-arm64-v8a`
-    : `https://download.lycn.qzz.io/xray-64`;
+
+  const fileName = arch === 'arm'
+    ? `xray-linux-arm64-v8a`
+    : `xray-linux-64`;
+  
+  const official = `https://github.com/XTLS/Xray-core/releases/download/v${XRAY_VERSION}/${fileName}.zip`;
+  const mirror = `https://download.lycn.qzz.io/${fileName}`;
 
   const zipPath = `${xrayPath}.zip`;
 
-  await retry(() => downloadFile(url, zipPath));
+  await downloadWithFallback(
+    [official, mirror],
+    zipPath
+  );
 
   await new Promise((resolve, reject) => {
     fs.createReadStream(zipPath)
@@ -162,7 +198,7 @@ async function downloadXray(xrayPath) {
         if (entry.path === 'xray') {
           entry.pipe(fs.createWriteStream(xrayPath));
         } else {
-          entry.autodrain(); // 关键：其它文件直接丢弃
+          entry.autodrain();
         }
       })
       .on('close', resolve)
@@ -178,14 +214,21 @@ async function downloadCloudflared(binPath) {
   if (fs.existsSync(binPath)) return;
 
   const arch = getArch();
-  const url = arch === 'arm'
-    ? `https://download.lycn.qzz.io/cloudflare-arm64`
-    : `https://download.lycn.qzz.io/cloudflare-amd64`;
 
-  await retry(() => downloadFile(url, binPath));
+  const fileName = arch === 'arm'
+    ? `cloudflared-linux-arm64`
+    : `cloudflared-linux-amd64`;
+
+  const official = `https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/${fileName}`;
+  const mirror = `https://download.lycn.qzz.io/${fileName}`;
+
+  await downloadWithFallback(
+    [official, mirror],
+    binPath
+  );
+
   fs.chmodSync(binPath, 0o755);
 }
-
 /* ================== Xray ================== */
 
 function writeXrayConfig(configPath) {
