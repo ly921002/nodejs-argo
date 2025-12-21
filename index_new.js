@@ -19,9 +19,6 @@ const SUB_PATH = process.env.SUB_PATH || 'sub';
 const PORT = process.env.PORT || 3000;
 const UUID = process.env.UUID || '';
 
-const XRAY_VERSION = process.env.XRAY_VERSION || '25.12.8';
-const CLOUDFLARED_VERSION = process.env.CLOUDFLARED_VERSION || '2025.11.1';
-
 const ARGO_PORT = process.env.ARGO_PORT || 8001;
 const ARGO_AUTH = process.env.ARGO_AUTH || 'ey';
 const ARGO_DOMAIN = process.env.ARGO_DOMAIN || 'domain';
@@ -147,7 +144,7 @@ async function downloadXray(xrayPath) {
     ? `xray-linux-arm64-v8a`
     : `xray-linux-64`;
   
-  const official = `https://github.com/XTLS/Xray-core/releases/download/v${XRAY_VERSION}/${fileName}.zip`;
+  const official = `https://holy-elisabetta-lyscn-9e416f72.koyeb.app/https://github.com/XTLS/Xray-core/releases/latest/download/${fileName}.zip`;
   const mirror = `https://download.lycn.qzz.io/${fileName}`;
 
   const zipPath = `${xrayPath}.zip`;
@@ -186,7 +183,7 @@ async function downloadCloudflared(binPath) {
     ? `cloudflared-linux-arm64`
     : `cloudflared-linux-amd64`;
 
-  const official = `https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/${fileName}`;
+  const official = `https://holy-elisabetta-lyscn-9e416f72.koyeb.app/https://github.com/cloudflare/cloudflared/releases/latest/download/${fileName}`;
   const mirror = `https://download.lycn.qzz.io/${fileName}`;
 
   await downloadWithFallback(
