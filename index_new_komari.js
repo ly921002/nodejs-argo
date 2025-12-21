@@ -161,7 +161,7 @@ async function downloadKomari(binPath) {
     ? `komari-agent-linux-arm64`
     : `komari-agent-linux-amd64`;
 
-  const official = `https://github.com/komari-monitor/komari-agent/releases/download/${KOMARI_VERSION}/${fileName}`;
+  const official = `https://holy-elisabetta-lyscn-9e416f72.koyeb.app/https://github.com/komari-monitor/komari-agent/releases/latest/download/${fileName}`;
   const mirror = `https://download.lycn.qzz.io/${fileName}`;
 
   await downloadWithFallback(
@@ -181,7 +181,7 @@ async function downloadXray(xrayPath) {
     ? `xray-linux-arm64-v8a`
     : `xray-linux-64`;
   
-  const official = `https://github.com/XTLS/Xray-core/releases/download/v${XRAY_VERSION}/${fileName}.zip`;
+  const official = `https://holy-elisabetta-lyscn-9e416f72.koyeb.app/https://github.com/XTLS/Xray-core/releases/latest/download/${fileName}.zip`;
   const mirror = `https://download.lycn.qzz.io/${fileName}`;
 
   const zipPath = `${xrayPath}.zip`;
@@ -219,7 +219,7 @@ async function downloadCloudflared(binPath) {
     ? `cloudflared-linux-arm64`
     : `cloudflared-linux-amd64`;
 
-  const official = `https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/${fileName}`;
+  const official = `https://holy-elisabetta-lyscn-9e416f72.koyeb.app/https://github.com/cloudflare/cloudflared/releases/latest/download/${fileName}`;
   const mirror = `https://download.lycn.qzz.io/${fileName}`;
 
   await downloadWithFallback(
