@@ -30,9 +30,6 @@ const NAME = process.env.NAME || '';
 const KOMARI_ENDPOINT = process.env.KOMARI_ENDPOINT || '';
 const KOMARI_TOKEN = process.env.KOMARI_TOKEN || '';
 
-const XRAY_VERSION = process.env.XRAY_VERSION || '25.12.8';
-const CLOUDFLARED_VERSION = process.env.CLOUDFLARED_VERSION || '2025.11.1';
-const KOMARI_VERSION = process.env.KOMARI_VERSION || '1.1.40';
 /* ================== 全局状态 ================== */
 
 const state = {
