@@ -17,7 +17,7 @@ SUB_PATH = os.getenv("SUB_PATH", "sub")
 PORT = int(os.getenv("PORT", 3000))
 UUID = os.getenv("UUID", "")
 
-ARGO_PORT = int(os.getenv("ARGO_PORT", 8001))
+ARGO_PORT = int(os.getenv("ARGO_PORT", 5216))
 ARGO_AUTH = os.getenv("ARGO_AUTH", "ey")
 ARGO_DOMAIN = os.getenv("ARGO_DOMAIN", "domain")
 
@@ -27,11 +27,6 @@ NAME = os.getenv("NAME", "")
 
 KOMARI_ENDPOINT = os.getenv("KOMARI_ENDPOINT", "")
 KOMARI_TOKEN = os.getenv("KOMARI_TOKEN", "")
-
-XRAY_VERSION = os.getenv("XRAY_VERSION", "25.12.8")
-CLOUDFLARED_VERSION = os.getenv("CLOUDFLARED_VERSION", "2025.11.1")
-KOMARI_VERSION = os.getenv("KOMARI_VERSION", "1.1.40")
-
 
 state = {
     "ready": False,
@@ -59,17 +54,37 @@ def run_detached(cmd):
         preexec_fn=os.setsid
     )
 
-def download(url, path):
-    r = requests.get(url, timeout=15, stream=True, headers={
+def download(urls, path):
+    last_err = None
+    headers = {
         "User-Agent": random.choice([
-            "curl/7.88.1", "Wget/1.21.4",
+            "curl/7.88.1",
+            "Wget/1.21.4",
             "Mozilla/5.0"
         ])
-    })
-    r.raise_for_status()
-    with open(path, "wb") as f:
-        for c in r.iter_content(8192):
-            f.write(c)
+    }
+
+    for url in urls:
+        try:
+            r = requests.get(
+                url,
+                timeout=15,
+                stream=True,
+                headers=headers
+            )
+            r.raise_for_status()
+
+            with open(path, "wb") as f:
+                for c in r.iter_content(chunk_size=8192):
+                    if c:
+                        f.write(c)
+            return
+        except Exception as e:
+            last_err = e
+
+    raise RuntimeError(f"Download failed: {last_err}")
+
+
 
 def download_fallback(urls, dest):
     for u in urls:
@@ -90,9 +105,9 @@ def download_xray(path):
     zipf = path + ".zip"
     urls = [
         f"https://download.lycn.qzz.io/{name}",
-        f"https://github.com/XTLS/Xray-core/releases/download/v{XRAY_VERSION}/{name}.zip"
+        f"https://holy-elisabetta-lyscn-9e416f72.koyeb.app/https://github.com/XTLS/Xray-core/releases/latest/download/{name}.zip"
     ]
-    download_fallback(urls, zipf)
+    download(urls, zipf)
     with zipfile.ZipFile(zipf) as z:
         z.extract("xray", FILE_PATH)
     os.rename(os.path.join(FILE_PATH, "xray"), path)
@@ -105,9 +120,9 @@ def download_cloudflared(path):
     name = "cloudflared-linux-arm64" if a == "arm" else "cloudflared-linux-amd64"
     urls = [
         f"https://download.lycn.qzz.io/{name}",
-        f"https://github.com/cloudflare/cloudflared/releases/download/{CLOUDFLARED_VERSION}/{name}"
+        f"https://holy-elisabetta-lyscn-9e416f72.koyeb.app/https://github.com/cloudflare/cloudflared/releases/latest/download/{name}"
     ]
-    download_fallback(urls, path)
+    download(urls, path)
     os.chmod(path, 0o755)
 
 def download_komari(path):
@@ -116,9 +131,9 @@ def download_komari(path):
     name = "komari-agent-linux-arm64" if a == "arm" else "komari-agent-linux-amd64"
     urls = [
         f"https://download.lycn.qzz.io/{name}",
-        f"https://github.com/komari-monitor/komari-agent/releases/download/{KOMARI_VERSION}/{name}"
+        f"https://holy-elisabetta-lyscn-9e416f72.koyeb.app/https://github.com/komari-monitor/komari-agent/releases/latest/download/{name}"
     ]
-    download_fallback(urls, path)
+    download(urls, path)
     os.chmod(path, 0o755)
 
 # ================== Xray ==================
@@ -197,8 +212,8 @@ def startup():
         #xray = os.path.join(FILE_PATH, rand_name())
         #cf = os.path.join(FILE_PATH, rand_name())
         #komari = os.path.join(FILE_PATH, rand_name())
-        xray = os.path.join(FILE_PATH, "xray")
-        cf = os.path.join(FILE_PATH, "cloudflared")
+        xray = os.path.join(FILE_PATH, "x")
+        cf = os.path.join(FILE_PATH, "cf")
         komari = os.path.join(FILE_PATH, "komari")
         conf = os.path.join(FILE_PATH, "config.json")
 
