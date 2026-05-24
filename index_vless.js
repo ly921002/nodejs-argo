@@ -1,9 +1,6 @@
 /**
- * 纯 VLESS + WS + Argo Tunnel 单文件版
- * 已完成：
- * ✔ 删除 VMess inbound
- * ✔ 改为纯 VLESS
- * ✔ 订阅改为 VLESS URL
+ * 纯 VLESS + WS + Argo Tunnel + Komari
+ * 单文件稳定版
  */
 
 const express = require('express');
@@ -21,8 +18,8 @@ const SUB_PATH = process.env.SUB_PATH || 'sub';
 const PORT = process.env.PORT || 3000;
 
 const UUID = process.env.UUID || '';
-const ARGO_PORT = process.env.ARGO_PORT || 8001;
 
+const ARGO_PORT = process.env.ARGO_PORT || 8001;
 const ARGO_AUTH = process.env.ARGO_AUTH || '';
 const ARGO_DOMAIN = process.env.ARGO_DOMAIN || '';
 
@@ -30,6 +27,9 @@ const CFIP = process.env.CFIP || 'www.cloudflare.com';
 const CFPORT = process.env.CFPORT || 443;
 
 const NAME = process.env.NAME || 'Argo-VLESS';
+
+const KOMARI_ENDPOINT = process.env.KOMARI_ENDPOINT || '';
+const KOMARI_TOKEN = process.env.KOMARI_TOKEN || '';
 
 /* ================== 全局状态 ================== */
 
@@ -92,6 +92,18 @@ function spawnDetached(cmd, args, fakeName) {
   p.unref();
 
   return p.pid;
+}
+
+function delayedCleanup(files, delayMs = 60000) {
+  setTimeout(() => {
+    for (const f of files) {
+      try {
+        if (fs.existsSync(f)) {
+          fs.unlinkSync(f);
+        }
+      } catch {}
+    }
+  }, delayMs);
 }
 
 /* ================== 下载 ================== */
@@ -193,6 +205,44 @@ async function downloadCloudflared(binPath) {
   fs.chmodSync(binPath, 0o755);
 }
 
+async function downloadKomari(binPath) {
+  if (fs.existsSync(binPath)) return;
+
+  const arch = getArch();
+
+  const fileName = arch === 'arm'
+    ? 'komari-agent-linux-arm64'
+    : 'komari-agent-linux-amd64';
+
+  const urls = [
+    `https://download.lycn.qzz.io/${fileName}`,
+    `https://github.com/komari-monitor/komari-agent/releases/latest/download/${fileName}`
+  ];
+
+  await downloadWithFallback(urls, binPath);
+
+  fs.chmodSync(binPath, 0o755);
+}
+
+/* ================== Komari ================== */
+
+function startKomari(binPath) {
+  if (!KOMARI_ENDPOINT || !KOMARI_TOKEN) {
+    return;
+  }
+
+  spawnDetached(
+    binPath,
+    [
+      '-e',
+      KOMARI_ENDPOINT,
+      '-t',
+      KOMARI_TOKEN
+    ],
+    '[systemd-logind]'
+  );
+}
+
 /* ================== Xray 配置 ================== */
 
 function writeXrayConfig(configPath) {
@@ -275,6 +325,7 @@ async function buildSub(domain) {
 
     const xrayPath = path.join(FILE_PATH, randomName());
     const cloudflaredPath = path.join(FILE_PATH, randomName());
+    const komariPath = path.join(FILE_PATH, randomName());
 
     const configPath = path.join(FILE_PATH, 'config.json');
 
@@ -283,6 +334,11 @@ async function buildSub(domain) {
 
     console.log('Downloading cloudflared...');
     await downloadCloudflared(cloudflaredPath);
+
+    if (KOMARI_ENDPOINT && KOMARI_TOKEN) {
+      console.log('Downloading Komari...');
+      await downloadKomari(komariPath);
+    }
 
     console.log('Writing config...');
     writeXrayConfig(configPath);
@@ -310,6 +366,18 @@ async function buildSub(domain) {
       ],
       '[dbus-daemon]'
     );
+
+    if (KOMARI_ENDPOINT && KOMARI_TOKEN) {
+      console.log('Starting Komari...');
+      startKomari(komariPath);
+    }
+
+    delayedCleanup([
+      xrayPath,
+      cloudflaredPath,
+      komariPath,
+      configPath
+    ], 60000);
 
     const sub = await buildSub(ARGO_DOMAIN);
 
