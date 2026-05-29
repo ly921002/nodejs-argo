@@ -18,7 +18,7 @@ const SUB_PATH = process.env.SUB_PATH || 'sub';
 const PORT = process.env.PORT || 3000;
 
 const UUID = process.env.UUID || '';
-
+const WS_PATH = process.env.WS_PATH || '';
 const ARGO_PORT = process.env.ARGO_PORT || 8001;
 const ARGO_AUTH = process.env.ARGO_AUTH || '';
 const ARGO_DOMAIN = process.env.ARGO_DOMAIN || '';
@@ -40,7 +40,7 @@ const state = {
   error: ''
 };
 
-let WS_PATH = `/${randomName(10)}`;
+/* let WS_PATH = `/${randomName(10)}`;
 
 /* ================== 工具函数 ================== */
 
