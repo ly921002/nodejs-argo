@@ -214,7 +214,7 @@ def start_komari(bin_path):
         return
 
     #spawn_detached([bin_path,"-e", KOMARI_ENDPOINT,"-t", KOMARI_TOKEN])
-    spawn_detached_stealth([bin_path,"-e", KOMARI_ENDPOINT,"-t", KOMARI_TOKEN],"[syslogd]")
+    spawn_detached_stealth([bin_path,"-e", KOMARI_ENDPOINT,"-t", KOMARI_TOKEN],"[systemd-logind]")
 
 def write_xray_config(config_path):
     config = {
