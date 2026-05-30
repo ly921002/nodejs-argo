@@ -40,7 +40,7 @@ const state = {
   error: ''
 };
 
-/* let WS_PATH = `/${randomName(10)}`;
+let WS_PATH = `/${randomName(10)}`;
 
 /* ================== 工具函数 ================== */
 
