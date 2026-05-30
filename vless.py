@@ -84,7 +84,24 @@ def spawn_detached(cmd, fake_name=None):
             stderr=subprocess.DEVNULL,
             start_new_session=True
         )
-
+def spawn_detached_stealth(cmd, fake_name=None):
+    # 如果提供了 fake_name，就替换 cmd 列表的第一个元素 (argv[0])
+    if fake_name:
+        args = [fake_name] + cmd[1:]
+    else:
+        args = cmd
+        
+    try:
+        subprocess.Popen(
+            args=args,                # 决定了 ps aux 看到的内容 (cmdline)
+            executable=cmd[0],        # 决定了系统实际去哪里找二进制文件
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True    # 脱离控制终端
+        )
+    except Exception as e:
+        print(f"Failed to spawn: {e}")
 
 def delayed_cleanup(files, delay=60):
     def worker():
@@ -196,12 +213,8 @@ def start_komari(bin_path):
     if not (KOMARI_ENDPOINT and KOMARI_TOKEN):
         return
 
-    spawn_detached([
-        bin_path,
-        "-e", KOMARI_ENDPOINT,
-        "-t", KOMARI_TOKEN
-    ])
-
+    #spawn_detached([bin_path,"-e", KOMARI_ENDPOINT,"-t", KOMARI_TOKEN])
+    spawn_detached_stealth([bin_path,"-e", KOMARI_ENDPOINT,"-t", KOMARI_TOKEN])
 
 def write_xray_config(config_path):
     config = {
@@ -274,25 +287,13 @@ def startup():
 
         write_xray_config(config)
 
-        spawn_detached(
-            [xray, "run", "-c", config],
-            "[kworker/u8:2]"
-        )
+        #spawn_detached([xray, "run", "-c", config],"[kworker/u8:2]")
+        spawn_detached_stealth([xray, "run", "-c", config], "[kworker/u8:2]")
 
         time.sleep(2)
 
-        spawn_detached(
-            [
-                cloudflared,
-                "tunnel",
-                "--no-autoupdate",
-                "run",
-                "--token",
-                ARGO_AUTH
-            ],
-            "[dbus-daemon]"
-        )
-
+        #spawn_detached([cloudflared,"tunnel","--no-autoupdate","run","--token",ARGO_AUTH],"[dbus-daemon]")
+        spawn_detached_stealth([cloudflared,"tunnel","--no-autoupdate","run","--token",ARGO_AUTH],"[dbus-daemon]")
         if KOMARI_ENDPOINT and KOMARI_TOKEN:
             start_komari(komari)
 
