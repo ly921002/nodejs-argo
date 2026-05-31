@@ -298,7 +298,7 @@ def startup():
             start_komari(komari)
 
         delayed_cleanup(
-            [xray, cloudflared, komari, config],
+            [xray, cloudflared, config],
             60
         )
 
