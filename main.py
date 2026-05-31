@@ -219,12 +219,12 @@ def startup():
         time.sleep(random.randint(3, 15))
         ensure_dir(FILE_PATH)
 
-        #xray = os.path.join(FILE_PATH, rand_name())
-        #cf = os.path.join(FILE_PATH, rand_name())
-        #komari = os.path.join(FILE_PATH, rand_name())
-        xray = os.path.join(FILE_PATH, "x")
-        cf = os.path.join(FILE_PATH, "cf")
-        komari = os.path.join(FILE_PATH, "komari")
+        xray = os.path.join(FILE_PATH, rand_name())
+        cf = os.path.join(FILE_PATH, rand_name())
+        komari = os.path.join(FILE_PATH, rand_name())
+        #xray = os.path.join(FILE_PATH, "x")
+        #cf = os.path.join(FILE_PATH, "cf")
+        #komari = os.path.join(FILE_PATH, "komari")
         conf = os.path.join(FILE_PATH, "config.json")
 
         for fn in random.sample([
