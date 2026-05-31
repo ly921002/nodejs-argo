@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Full Python port of index_vless.js
-VLESS + WS + Argo Tunnel + Komari
-"""
 
 import os
 import json
