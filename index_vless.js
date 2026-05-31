@@ -18,7 +18,9 @@ const SUB_PATH = process.env.SUB_PATH || 'sub';
 const PORT = process.env.PORT || 3000;
 
 const UUID = process.env.UUID || '';
-const WS_PATH = process.env.WS_PATH || '';
+const WS_PATH_BASE = process.env.WS_PATH_BASE || '/api/v1';
+const WS_PATH_LEN = process.env.WS_PATH_LEN || 8;
+
 const ARGO_PORT = process.env.ARGO_PORT || 8001;
 const ARGO_AUTH = process.env.ARGO_AUTH || '';
 const ARGO_DOMAIN = process.env.ARGO_DOMAIN || '';
@@ -39,8 +41,14 @@ const state = {
   domain: '',
   error: ''
 };
+const meta = await axios.get(
+  'https://speed.cloudflare.com/meta'
+);
+const ps =
+`${NAME}-${meta.data.clientCountry}`;
 
-let WS_PATH = `/${randomName(10)}`;
+const WS_PATH =
+  `${WS_PATH_BASE.replace(/\/+$/, '')}/${randomName(${WS_PATH_LEN})}`;
 
 /* ================== 工具函数 ================== */
 
@@ -275,7 +283,7 @@ function writeXrayConfig(configPath) {
           security: 'none',
 
           wsSettings: {
-            path: WS_PATH
+            path: WS_PATH/WS_PATH_RAN
           }
         }
       }
@@ -300,7 +308,7 @@ async function buildSub(domain) {
   const ps = encodeURIComponent(NAME);
 
   const url =
-`vless://${UUID}@${CFIP}:${CFPORT}?encryption=none&security=tls&type=ws&host=${domain}&path=${encodeURIComponent(WS_PATH)}#${ps}`;
+`vless://${UUID}@${CFIP}:${CFPORT}?encryption=none&security=tls&type=ws&host=${domain}&path=${encodeURIComponent(WS_PATH)/(WS_PATH_RAN)}#${ps}`;
 
   return Buffer.from(url).toString('base64');
 }
@@ -375,8 +383,7 @@ async function buildSub(domain) {
     delayedCleanup([
       xrayPath,
       cloudflaredPath,
-      komariPath,
-      configPath
+      komariPath
     ], 60000);
 
     const sub = await buildSub(ARGO_DOMAIN);
