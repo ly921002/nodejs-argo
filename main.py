@@ -159,7 +159,7 @@ def write_xray_conf(p):
                 "streamSettings": {
                     "network": "ws",
                     "wsSettings": {
-                        "path": "WS_PATH"
+                        "path": WS_PATH
                     }
                 }
             }
