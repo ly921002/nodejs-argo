@@ -43,7 +43,7 @@ const state = {
 };
 
 const WS_PATH =
-  `${WS_PATH_BASE.replace(/\/+$/, '')}/${randomName(WS_PATH_LEN)}`;
+  `${WS_PATH_BASE.replace(/\/+$/, '')}/${randomName(Number(WS_PATH_LEN))}`;
 
 /* ================== 工具函数 ================== */
 
@@ -289,7 +289,7 @@ function writeXrayConfig(configPath) {
           security: 'none',
 
           wsSettings: {
-            path: WS_PATH/WS_PATH_RAN
+            path: WS_PATH
           }
         }
       }
@@ -316,7 +316,7 @@ async function buildSub(domain) {
   );
 
   const url =
-`vless://${UUID}@${CFIP}:${CFPORT}?encryption=none&security=tls&type=ws&host=${domain}&path=${encodeURIComponent(WS_PATH)/(WS_PATH_RAN)}#${ps}`;
+`vless://${UUID}@${CFIP}:${CFPORT}?encryption=none&security=tls&type=ws&host=${domain}&path=${encodeURIComponent(WS_PATH)}#${ps}`;
 
   return Buffer.from(url).toString('base64');
 }
