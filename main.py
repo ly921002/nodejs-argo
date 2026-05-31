@@ -151,6 +151,7 @@ def write_xray_conf(p):
         },
         "inbounds": [
             {
+                "listen": '127.0.0.1'
                 "port": ARGO_PORT,
                 "protocol": "vless",
                 "settings": {
