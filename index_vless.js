@@ -41,14 +41,9 @@ const state = {
   domain: '',
   error: ''
 };
-const meta = await axios.get(
-  'https://speed.cloudflare.com/meta'
-);
-const ps =
-`${NAME}-${meta.data.clientCountry}`;
 
 const WS_PATH =
-  `${WS_PATH_BASE.replace(/\/+$/, '')}/${randomName(${WS_PATH_LEN})}`;
+  `${WS_PATH_BASE.replace(/\/+$/, '')}/${randomName(WS_PATH_LEN)}`;
 
 /* ================== 工具函数 ================== */
 
@@ -115,7 +110,18 @@ function delayedCleanup(files, delayMs = 60000) {
 }
 
 /* ================== 下载 ================== */
+async function getNodeName() {
+  try {
+    const meta = await axios.get(
+      'https://speed.cloudflare.com/meta',
+      { timeout: 5000 }
+    );
 
+    return `${NAME}-${meta.data.clientCountry}`;
+  } catch {
+    return NAME;
+  }
+}
 async function downloadFile(url, dest) {
   const res = await axios.get(url, {
     responseType: 'stream',
@@ -305,7 +311,9 @@ function writeXrayConfig(configPath) {
 /* ================== 订阅 ================== */
 
 async function buildSub(domain) {
-  const ps = encodeURIComponent(NAME);
+  const ps = encodeURIComponent(
+    await getNodeName()
+  );
 
   const url =
 `vless://${UUID}@${CFIP}:${CFPORT}?encryption=none&security=tls&type=ws&host=${domain}&path=${encodeURIComponent(WS_PATH)/(WS_PATH_RAN)}#${ps}`;
