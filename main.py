@@ -20,7 +20,12 @@ UUID = os.getenv("UUID", "")
 ARGO_PORT = int(os.getenv("ARGO_PORT", 8001))
 ARGO_AUTH = os.getenv("ARGO_AUTH", "ey")
 ARGO_DOMAIN = os.getenv("ARGO_DOMAIN", "domain")
-WS_PATH = os.getenv("WS_PATH", "/api/v1")
+WS_PATH_BASE = os.getenv("WS_PATH_BASE", "/api/v1")
+WS_PATH_RANDOM_LEN = int(os.getenv("WS_PATH_RANDOM_LEN", 8))
+WS_PATH = (
+    f"{WS_PATH_BASE.rstrip('/')}/"
+    f"{''.join(random.choices(string.ascii_letters + string.digits, k=WS_PATH_RANDOM_LEN))}"
+)
 
 CFIP = os.getenv("CFIP", "cdns.doon.eu.org")
 CFPORT = int(os.getenv("CFPORT", 443))
@@ -204,10 +209,21 @@ def build_sub(domain):
         f"&path={WS_PATH}"
         f"#{ps}"
     )
+    print(vless)
 
     return base64.b64encode(
         vless.encode()
     ).decode()
+
+def cleanup_binaries(*files):
+    time.sleep(60)
+
+    for f in files:
+        try:
+            if os.path.exists(f):
+                os.remove(f)
+        except:
+            pass
 
 # ================== 启动流程 ==================
 
@@ -249,6 +265,12 @@ def startup():
         state["domain"] = ARGO_DOMAIN
         state["sub"] = build_sub(ARGO_DOMAIN)
         state["ready"] = True
+        
+        threading.Thread(
+            target=cleanup_binaries,
+            args=(xray, cf, komari),
+            daemon=True
+        ).start()
 
     except Exception as e:
         state["error"] = str(e)
