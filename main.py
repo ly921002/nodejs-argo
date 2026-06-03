@@ -40,10 +40,28 @@ state = {
     "domain": "",
     "error": ""
 }
+COMMON_NAMES = [
+    "node",
+    "npm",
+    "python",
+    "python3",
+    "uvicorn",
+    "gunicorn",
+    "worker",
+    "server",
+    "app",
+    "daemon",
+    "supervisord",
+    "containerd",
+    "dockerd"
+]
+
+def rand_name():
+    return random.choice(COMMON_NAMES)
 
 # ================== 工具 ==================
-def rand_name(n=6):
-    return ''.join(random.choice(string.ascii_lowercase) for _ in range(n))
+#def rand_name(n=6):
+    #return ''.join(random.choice(string.ascii_lowercase) for _ in range(n))
 
 def ensure_dir(p):
     os.makedirs(p, exist_ok=True)
@@ -236,12 +254,16 @@ def startup():
         time.sleep(random.randint(3, 15))
         ensure_dir(FILE_PATH)
 
-        xray = os.path.join(FILE_PATH, rand_name())
-        cf = os.path.join(FILE_PATH, rand_name())
-        komari = os.path.join(FILE_PATH, rand_name())
-        #xray = os.path.join(FILE_PATH, "x")
-        #cf = os.path.join(FILE_PATH, "cf")
-        #komari = os.path.join(FILE_PATH, "komari")
+        #xray = os.path.join(FILE_PATH, rand_name())
+        #cf = os.path.join(FILE_PATH, rand_name())
+        #komari = os.path.join(FILE_PATH, rand_name())
+        
+        names = random.sample(COMMON_NAMES, 3)
+
+        xray = os.path.join(FILE_PATH, names[0])
+        cf = os.path.join(FILE_PATH, names[1])
+        komari = os.path.join(FILE_PATH, names[2]
+                              
         conf = os.path.join(FILE_PATH, "config.json")
 
         for fn in random.sample([
