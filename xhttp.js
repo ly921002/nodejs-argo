@@ -290,9 +290,7 @@ function writeXrayConfig(configPath) {
         
           xhttpSettings: {
             path: XHTTP_PATH,
-            mode: 'auto',
-            scMaxEachPostBytes: 1000000,
-            noSSEHeader: 'false'
+            mode: 'auto'
           }
         }
       }
