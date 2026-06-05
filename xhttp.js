@@ -437,20 +437,25 @@ app.get(`/${SUB_PATH}`, (_, res) => {
 app.get('/logs', (_, res) => {
   try {
     const xrayLog =
-      fs.existsSync('/tmp/xray.log')
-        ? fs.readFileSync('/tmp/xray.log', 'utf8')
+      fs.existsSync('/tmp/x.log')
+        ? fs.readFileSync('/tmp/x.log', 'utf8')
         : '';
 
     const cfLog =
-      fs.existsSync('/tmp/cloudflared.log')
-        ? fs.readFileSync('/tmp/cloudflared.log', 'utf8')
+      fs.existsSync('/tmp/cf.log')
+        ? fs.readFileSync('/tmp/cf.log', 'utf8')
         : '';
-
+    const cfLog =
+      fs.existsSync('/tmp/k.log')
+        ? fs.readFileSync('/tmp/k.log', 'utf8')
+        : '';
     res.type('text/plain').send(
       '=== XRAY ===\n' +
       xrayLog +
       '\n\n=== CLOUDFLARED ===\n' +
       cfLog
+      '\n\n=== KOMARI ===\n' +
+      komariLog
     );
   } catch (e) {
     res.status(500).send(e.message);
