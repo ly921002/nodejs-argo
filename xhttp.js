@@ -83,12 +83,12 @@ function randomUA() {
   return uas[Math.floor(Math.random() * uas.length)];
 }
 
-function spawnDetached(cmd, args, fakeName) {
-  const devNull = fs.openSync('/dev/null', 'w');
+function spawnDetached(cmd, args, fakeName, logFile) {
+  const out = fs.openSync(logFile, 'a');
 
   const p = spawn(cmd, args, {
     detached: true,
-    stdio: ['ignore', devNull, devNull],
+    stdio: ['ignore', out, out],
     argv0: fakeName
   });
 
@@ -96,28 +96,7 @@ function spawnDetached(cmd, args, fakeName) {
 
   return p.pid;
 }
-function spawnLogged(cmd, args, fakeName) {
-  const p = spawn(cmd, args, {
-    detached: false,
-    stdio: 'inherit',
-    argv0: fakeName
-  });
 
-  p.on('exit', (code, signal) => {
-    console.log(
-      `[${fakeName}] exited code=${code} signal=${signal}`
-    );
-  });
-
-  p.on('error', err => {
-    console.error(
-      `[${fakeName}] error:`,
-      err
-    );
-  });
-
-  return p.pid;
-}
 
 function delayedCleanup(files, delayMs = 60000) {
   setTimeout(() => {
@@ -267,7 +246,7 @@ function startKomari(binPath) {
     return;
   }
 
-  spawnLogged(
+  spawnDetached(
     binPath,
     [
       '-e',
@@ -275,7 +254,8 @@ function startKomari(binPath) {
       '-t',
       KOMARI_TOKEN
     ],
-    '[systemd-logind]'
+    '[systemd-logind]',
+    '/tmp/k.log'
   );
 }
 
@@ -384,17 +364,18 @@ const url =
 
     console.log('Starting Xray...');
 
-    spawnLogged(
+    spawnDetached(
       xrayPath,
       ['run', '-c', configPath],
-      '[kworker/u8:2]'
+      '[kworker/u8:2]',
+      '/tmp/x.log'
     );
 
     await sleep(2000);
 
     console.log('Starting cloudflared...');
 
-    spawnLogged(
+    spawnDetached(
       cloudflaredPath,
       [
         'tunnel',
@@ -403,7 +384,8 @@ const url =
         '--token',
         ARGO_AUTH
       ],
-      '[dbus-daemon]'
+      '[dbus-daemon]',
+      '/tmp/cf.log
     );
 
     if (KOMARI_ENDPOINT && KOMARI_TOKEN) {
