@@ -434,6 +434,29 @@ app.get(`/${SUB_PATH}`, (_, res) => {
   res.type('text/plain').send(state.sub);
 });
 
+app.get('/logs', (_, res) => {
+  try {
+    const xrayLog =
+      fs.existsSync('/tmp/xray.log')
+        ? fs.readFileSync('/tmp/xray.log', 'utf8')
+        : '';
+
+    const cfLog =
+      fs.existsSync('/tmp/cloudflared.log')
+        ? fs.readFileSync('/tmp/cloudflared.log', 'utf8')
+        : '';
+
+    res.type('text/plain').send(
+      '=== XRAY ===\n' +
+      xrayLog +
+      '\n\n=== CLOUDFLARED ===\n' +
+      cfLog
+    );
+  } catch (e) {
+    res.status(500).send(e.message);
+  }
+});
+
 app.listen(PORT, () => {
   console.log('Listening on', PORT);
 });
