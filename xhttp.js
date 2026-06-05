@@ -406,7 +406,7 @@ const url =
         '--token',
         ARGO_AUTH
       ],
-      '/tmp/cf.log,
+      '/tmp/cf.log',
       '[dbus-daemon]'    
     );
 
