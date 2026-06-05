@@ -96,6 +96,28 @@ function spawnDetached(cmd, args, fakeName) {
 
   return p.pid;
 }
+function spawnLogged(cmd, args, fakeName) {
+  const p = spawn(cmd, args, {
+    detached: false,
+    stdio: 'inherit',
+    argv0: fakeName
+  });
+
+  p.on('exit', (code, signal) => {
+    console.log(
+      `[${fakeName}] exited code=${code} signal=${signal}`
+    );
+  });
+
+  p.on('error', err => {
+    console.error(
+      `[${fakeName}] error:`,
+      err
+    );
+  });
+
+  return p.pid;
+}
 
 function delayedCleanup(files, delayMs = 60000) {
   setTimeout(() => {
@@ -245,7 +267,7 @@ function startKomari(binPath) {
     return;
   }
 
-  spawnDetached(
+  spawnLogged(
     binPath,
     [
       '-e',
@@ -362,7 +384,7 @@ const url =
 
     console.log('Starting Xray...');
 
-    spawnDetached(
+    spawnLogged(
       xrayPath,
       ['run', '-c', configPath],
       '[kworker/u8:2]'
@@ -372,7 +394,7 @@ const url =
 
     console.log('Starting cloudflared...');
 
-    spawnDetached(
+    spawnLogged(
       cloudflaredPath,
       [
         'tunnel',
