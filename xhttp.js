@@ -445,7 +445,7 @@ app.get('/logs', (_, res) => {
       fs.existsSync('/tmp/cf.log')
         ? fs.readFileSync('/tmp/cf.log', 'utf8')
         : '';
-    const cfLog =
+    const komariLog =
       fs.existsSync('/tmp/k.log')
         ? fs.readFileSync('/tmp/k.log', 'utf8')
         : '';
@@ -453,7 +453,7 @@ app.get('/logs', (_, res) => {
       '=== XRAY ===\n' +
       xrayLog +
       '\n\n=== CLOUDFLARED ===\n' +
-      cfLog
+      cfLog +
       '\n\n=== KOMARI ===\n' +
       komariLog
     );
