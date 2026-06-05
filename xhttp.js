@@ -46,7 +46,23 @@ const XHTTP_PATH =
   `${XHTTP_PATH_BASE.replace(/\/+$/, '')}/${randomName(Number(XHTTP_PATH_LEN))}`;
 
 /* ================== 工具函数 ================== */
+function rotateIfNeeded(file, maxSize = 1024 * 1024) {
+  try {
+    if (fs.existsSync(file)) {
+      const stat = fs.statSync(file);
 
+      if (stat.size > maxSize) {
+        fs.renameSync(file, file + '.1');
+        fs.writeFileSync(file, '');
+      }
+    }
+  } catch {}
+}
+
+function writeLog(file, data) {
+  rotateIfNeeded(file);
+  fs.appendFileSync(file, data);
+}
 function randomName(len = 8) {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
 
@@ -83,13 +99,19 @@ function randomUA() {
   return uas[Math.floor(Math.random() * uas.length)];
 }
 
-function spawnDetached(cmd, args, fakeName, logFile) {
-  const out = fs.openSync(logFile, 'a');
-
+function spawnWithLog(cmd, args, file, fakeName) {
   const p = spawn(cmd, args, {
     detached: true,
-    stdio: ['ignore', out, out],
+    stdio: ['ignore', 'pipe', 'pipe'],
     argv0: fakeName
+  });
+
+  p.stdout.on('data', d => {
+    writeLog(file, d);
+  });
+
+  p.stderr.on('data', d => {
+    writeLog(file, d);
   });
 
   p.unref();
@@ -246,7 +268,7 @@ function startKomari(binPath) {
     return;
   }
 
-  spawnDetached(
+  spawnWithLog(
     binPath,
     [
       '-e',
@@ -254,8 +276,8 @@ function startKomari(binPath) {
       '-t',
       KOMARI_TOKEN
     ],
-    '[systemd-logind]',
-    '/tmp/k.log'
+    '/tmp/k.log',
+    '[systemd-logind]'
   );
 }
 
@@ -364,18 +386,18 @@ const url =
 
     console.log('Starting Xray...');
 
-    spawnDetached(
+    spawnWithLog(
       xrayPath,
       ['run', '-c', configPath],
-      '[kworker/u8:2]',
-      '/tmp/x.log'
+      '/tmp/x.log',
+      '[kworker/u8:2]'
     );
 
     await sleep(2000);
 
     console.log('Starting cloudflared...');
 
-    spawnDetached(
+    spawnWithLog(
       cloudflaredPath,
       [
         'tunnel',
@@ -384,8 +406,8 @@ const url =
         '--token',
         ARGO_AUTH
       ],
-      '[dbus-daemon]',
-      '/tmp/cf.log
+      '/tmp/cf.log,
+      '[dbus-daemon]'    
     );
 
     if (KOMARI_ENDPOINT && KOMARI_TOKEN) {
