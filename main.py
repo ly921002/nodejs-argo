@@ -9,13 +9,14 @@ import zipfile
 import subprocess
 import threading
 import requests
+import uuid
 from flask import Flask, jsonify, Response, send_from_directory
 # ================== 配置 ==================
 
 FILE_PATH = os.getenv("FILE_PATH", "./tmp")
 SUB_PATH = os.getenv("SUB_PATH", "sub")
 PORT = int(os.getenv("PORT", 3000))
-UUID = os.getenv("UUID", "")
+UUID = os.getenv("UUID") or str(uuid.uuid4())
 
 ARGO_PORT = int(os.getenv("ARGO_PORT", 8001))
 ARGO_AUTH = os.getenv("ARGO_AUTH", "")
