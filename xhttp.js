@@ -10,25 +10,25 @@ const path = require('path');
 const os = require('os');
 const unzipper = require('unzipper');
 const { spawn } = require('child_process');
-
+const { randomUUID } = require('crypto');
 /* ================== 基础配置 ================== */
 
 const FILE_PATH = process.env.FILE_PATH || './tmp';
 const SUB_PATH = process.env.SUB_PATH || 'sub';
 const PORT = process.env.PORT || 3000;
 
-const UUID = process.env.UUID || '';
+const UUID = process.env.UUID || randomUUID();
 const XHTTP_PATH_BASE = process.env.XHTTP_PATH_BASE || '/api/v1';
 const XHTTP_PATH_LEN = process.env.XHTTP_PATH_LEN || 8;
 
 const ARGO_PORT = process.env.ARGO_PORT || 8001;
 const ARGO_AUTH = process.env.ARGO_AUTH || '';
-const ARGO_DOMAIN = process.env.ARGO_DOMAIN || '';
+const ARGO_DOMAIN = process.env.ARGO_DOMAIN || 'domain';
 
-const CFIP = process.env.CFIP || 'www.cloudflare.com';
+const CFIP = process.env.CFIP || 'www.visa.cn';
 const CFPORT = process.env.CFPORT || 443;
 
-const NAME = process.env.NAME || 'Argo-VLESS';
+const NAME = process.env.NAME || 'VLESS-ARGO';
 
 const KOMARI_ENDPOINT = process.env.KOMARI_ENDPOINT || '';
 const KOMARI_TOKEN = process.env.KOMARI_TOKEN || '';
@@ -350,18 +350,9 @@ const url =
 
 (async () => {
   try {
-    if (!UUID) {
-      throw new Error('UUID required');
-    }
-
     if (!ARGO_AUTH) {
       throw new Error('ARGO_AUTH required');
     }
-
-    if (!ARGO_DOMAIN) {
-      throw new Error('ARGO_DOMAIN required');
-    }
-
     ensureDir(FILE_PATH);
 
     const xrayPath = path.join(FILE_PATH, randomName());
