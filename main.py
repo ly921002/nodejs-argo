@@ -41,7 +41,7 @@ state = {
     "sub": "",
     "domain": "",
     "error": "",
-    "": "",
+    "UUID": "",
     "xhttp_path": ""
 }
 COMMON_NAMES = [
@@ -125,17 +125,6 @@ def download(urls, path):
     raise RuntimeError(f"Download failed: {last_err}")
 
 
-
-def download_fallback(urls, dest):
-    for u in urls:
-        try:
-            download(u, dest)
-            return
-        except:
-            if os.path.exists(dest):
-                os.remove(dest)
-    raise RuntimeError("all download failed")
-
 # ================== 下载组件 ==================
 
 def download_xray(path):
@@ -191,7 +180,7 @@ def write_xray_conf(p):
                 "settings": {
                     "clients": [
                         {
-                            "id": 
+                            "id": UUID
                         }
                     ],
                     "decryption": "none"
@@ -238,7 +227,7 @@ def build_sub(domain):
     ps = f"{NAME}-{meta}" if NAME else meta
 
     vless = (
-        f"vless://{}@{CFIP}:{CFPORT}"
+        f"vless://{UUID}@{CFIP}:{CFPORT}"
         f"?encryption=none"
         f"&security=tls"
         f"&type=xhttp"
