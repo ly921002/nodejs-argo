@@ -18,13 +18,13 @@ PORT = int(os.getenv("PORT", 3000))
 UUID = os.getenv("UUID", "")
 
 ARGO_PORT = int(os.getenv("ARGO_PORT", 8001))
-ARGO_AUTH = os.getenv("ARGO_AUTH", "ey")
+ARGO_AUTH = os.getenv("ARGO_AUTH", "")
 ARGO_DOMAIN = os.getenv("ARGO_DOMAIN", "domain")
-WS_PATH_BASE = os.getenv("WS_PATH_BASE", "/api/v1")
-WS_PATH_RANDOM_LEN = int(os.getenv("WS_PATH_RANDOM_LEN", 8))
-WS_PATH = (
-    f"{WS_PATH_BASE.rstrip('/')}/"
-    f"{''.join(random.choices(string.ascii_letters + string.digits, k=WS_PATH_RANDOM_LEN))}"
+XHTTP_PATH_BASE = os.getenv("XHTTP_PATH_BASE", "/api/v1")
+XHTTP_PATH_RANDOM_LEN = int(os.getenv("XHTTP_PATH_RANDOM_LEN", 8))
+XHTTP_PATH = (
+    f"{XHTTP_PATH_BASE.rstrip('/')}/"
+    f"{''.join(random.choices(string.ascii_letters + string.digits, k=XHTTP_PATH_RANDOM_LEN))}"
 )
 
 CFIP = os.getenv("CFIP", "cdns.doon.eu.org")
@@ -38,7 +38,9 @@ state = {
     "ready": False,
     "sub": "",
     "domain": "",
-    "error": ""
+    "error": "",
+    "uuid": "",
+    "xhttp_path": ""
 }
 COMMON_NAMES = [
     "node",
@@ -60,9 +62,6 @@ def rand_name():
     return random.choice(COMMON_NAMES)
 
 # ================== 工具 ==================
-#def rand_name(n=6):
-    #return ''.join(random.choice(string.ascii_lowercase) for _ in range(n))
-
 def ensure_dir(p):
     os.makedirs(p, exist_ok=True)
 
@@ -181,9 +180,9 @@ def write_xray_conf(p):
                     "decryption": "none"
                 },
                 "streamSettings": {
-                    "network": "ws",
-                    "wsSettings": {
-                        "path": WS_PATH
+                    "network": "xhttp",
+                    "xhttpSettings": {
+                        "path": XHTTP_PATH
                     }
                 }
             }
@@ -223,9 +222,9 @@ def build_sub(domain):
         f"vless://{UUID}@{CFIP}:{CFPORT}"
         f"?encryption=none"
         f"&security=tls"
-        f"&type=ws"
+        f"&type=xhttp"
         f"&host={domain}"
-        f"&path={WS_PATH}"
+        f"&path={XHTTP_PATH}"
         f"#{ps}"
     )
     print(vless)
@@ -302,24 +301,36 @@ threading.Thread(target=startup, daemon=True).start()
 
 # ================== HTTP ==================
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='public')
 
-@app.route("/")
-def index():
-    # 尝试返回 index.html，模拟正常网页
-    if os.path.exists("index.html"):
-        return send_from_directory('.', 'index.html')
-    return "Service is running."
+# 1. 静态文件优先
+@app.route("/<path:filename>")
+def static_files(filename):
+    if os.path.exists(os.path.join(app.static_folder, filename)):
+        return send_from_directory(app.static_folder, filename)
+    return "File not found", 404
 
+# 2. health
 @app.route("/health")
 def health():
-    return jsonify(state)
+    return jsonify({
+        "ready": state["ready"],
+        "domain": state["domain"],
+        "error": state["error"]
+    })
 
+# 3. 订阅 /sub
 @app.route(f"/{SUB_PATH}")
-def sub(): 
+def sub():
     if not state["ready"]:
         return Response("Not ready", 503)
-    return Response(state["sub"], mimetype="text/plain")
+    
+    info = (
+        f"UUID: {state['uuid']}\n"
+        f"XHTTP_PATH: {state['xhttp_path']}\n\n"
+        f"SUB:\n{state['sub']}"
+    )
+    return Response(info, mimetype="text/plain")
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=PORT)
