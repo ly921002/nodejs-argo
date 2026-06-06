@@ -430,11 +430,16 @@ const url =
 /* ================== HTTP ================== */
 
 const app = express();
+// 1. 静态文件优先
+app.use(express.static(path.join(__dirname, 'public')));
 
-app.get('/', (_, res) => {
-  res.send('VLESS Argo Service Running');
+// 2. API 路由
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api') || req.path === '/health' || req.path === '/logs') {
+    return next();
+  }
+  next();
 });
-
 app.get('/health', (_, res) => {
   res.json(state);
 });
@@ -473,6 +478,11 @@ app.get('/logs', (_, res) => {
   } catch (e) {
     res.status(500).send(e.message);
   }
+});
+
+// 3. 首页 fallback（最后）
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 app.listen(PORT, () => {
