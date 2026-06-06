@@ -60,7 +60,22 @@ COMMON_NAMES = [
 
 def rand_name():
     return random.choice(COMMON_NAMES)
+def rotate_if_needed(file, max_size=1024*1024):
+    try:
+        if os.path.exists(file):
+            if os.path.getsize(file) > max_size:
 
+                backup = file + ".1"
+
+                if os.path.exists(backup):
+                    os.remove(backup)
+
+                os.rename(file, backup)
+
+                open(file, "w").close()
+
+    except Exception:
+        pass
 # ================== 工具 ==================
 def ensure_dir(p):
     os.makedirs(p, exist_ok=True)
@@ -181,8 +196,10 @@ def write_xray_conf(p):
                 },
                 "streamSettings": {
                     "network": "xhttp",
+                    "security": 'none',
                     "xhttpSettings": {
-                        "path": XHTTP_PATH
+                        "path": XHTTP_PATH,
+                        "mode": 'auto'
                     }
                 }
             }
@@ -261,7 +278,7 @@ def startup():
 
         xray = os.path.join(FILE_PATH, names[0])
         cf = os.path.join(FILE_PATH, names[1])
-        komari = os.path.join(FILE_PATH, names[2]
+        komari = os.path.join(FILE_PATH, names[2])
                               
         conf = os.path.join(FILE_PATH, "config.json")
 
@@ -275,17 +292,15 @@ def startup():
         write_xray_conf(conf)
 
         run_detached([xray, "run", "-c", conf])
-
-        if ARGO_AUTH:
-            run_detached([cf, "tunnel", "run", "--token", ARGO_AUTH])
-        else:
-            run_detached([cf, "tunnel", "--url", f"http://localhost:{ARGO_PORT}"])
-
+        run_detached([cf, "tunnel", "--no-autoupdate", "run", "--token", ARGO_AUTH])
+        
         if KOMARI_ENDPOINT and KOMARI_TOKEN:
             run_detached([komari, "-e", KOMARI_ENDPOINT, "-t", KOMARI_TOKEN])
         
         state["domain"] = ARGO_DOMAIN
         state["sub"] = build_sub(ARGO_DOMAIN)
+        state["uuid"] = UUID
+        state["xhttp_path"] = XHTTP_PATH
         state["ready"] = True
         
         threading.Thread(
@@ -302,14 +317,12 @@ threading.Thread(target=startup, daemon=True).start()
 # ================== HTTP ==================
 
 app = Flask(__name__, static_folder='public')
-
 # 1. 静态文件优先
 @app.route("/<path:filename>")
 def static_files(filename):
     if os.path.exists(os.path.join(app.static_folder, filename)):
         return send_from_directory(app.static_folder, filename)
     return "File not found", 404
-
 # 2. health
 @app.route("/health")
 def health():
@@ -318,7 +331,6 @@ def health():
         "domain": state["domain"],
         "error": state["error"]
     })
-
 # 3. 订阅 /sub
 @app.route(f"/{SUB_PATH}")
 def sub():
@@ -331,6 +343,14 @@ def sub():
         f"SUB:\n{state['sub']}"
     )
     return Response(info, mimetype="text/plain")
+
+# 5. 首页 fallback
+@app.route("/")
+def index():
+    index_file = os.path.join(app.static_folder, "index.html")
+    if os.path.exists(index_file):
+        return send_from_directory(app.static_folder, "index.html")
+    return "Service is running."
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=PORT)
