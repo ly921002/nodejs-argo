@@ -16,7 +16,8 @@ from flask import Flask, jsonify, Response, send_from_directory
 FILE_PATH = os.getenv("FILE_PATH", "./tmp")
 SUB_PATH = os.getenv("SUB_PATH", "sub")
 PORT = int(os.getenv("PORT", 3000))
-UUID = os.getenv("UUID") or str(uuid.uuid4())
+raw = os.getenv("UUID")
+UUID = raw if raw and raw.strip() else str(uuid.uuid4())
 
 ARGO_PORT = int(os.getenv("ARGO_PORT", 8001))
 ARGO_AUTH = os.getenv("ARGO_AUTH", "")
