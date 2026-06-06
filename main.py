@@ -16,9 +16,9 @@ from flask import Flask, jsonify, Response, send_from_directory
 FILE_PATH = os.getenv("FILE_PATH", "./tmp")
 SUB_PATH = os.getenv("SUB_PATH", "sub")
 PORT = int(os.getenv("PORT", 3000))
-raw = os.getenv("UUID")
-UUID = raw if raw and raw.strip() else str(uuid.uuid4())
-
+UUID = os.getenv("UUID")
+if not UUID:
+    UUID = str(uuid.uuid4())
 ARGO_PORT = int(os.getenv("ARGO_PORT", 8001))
 ARGO_AUTH = os.getenv("ARGO_AUTH", "")
 ARGO_DOMAIN = os.getenv("ARGO_DOMAIN", "domain")
@@ -41,7 +41,7 @@ state = {
     "sub": "",
     "domain": "",
     "error": "",
-    "uuid": "",
+    "": "",
     "xhttp_path": ""
 }
 COMMON_NAMES = [
@@ -191,7 +191,7 @@ def write_xray_conf(p):
                 "settings": {
                     "clients": [
                         {
-                            "id": UUID
+                            "id": 
                         }
                     ],
                     "decryption": "none"
@@ -238,7 +238,7 @@ def build_sub(domain):
     ps = f"{NAME}-{meta}" if NAME else meta
 
     vless = (
-        f"vless://{UUID}@{CFIP}:{CFPORT}"
+        f"vless://{}@{CFIP}:{CFPORT}"
         f"?encryption=none"
         f"&security=tls"
         f"&type=xhttp"
@@ -267,9 +267,6 @@ def cleanup_binaries(*files):
 
 def startup():
     try:
-        if not UUID:
-            raise RuntimeError("UUID required")
-
         time.sleep(random.randint(3, 15))
         ensure_dir(FILE_PATH)
 
