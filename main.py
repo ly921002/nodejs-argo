@@ -145,7 +145,7 @@ def download_xray(path):
     zipf = path + ".zip"
     urls = [
         f"https://download.lycn.qzz.io/{name}",
-        f"https://holy-elisabetta-lyscn-9e416f72.koyeb.app/https://github.com/XTLS/Xray-core/releases/latest/download/{name}.zip"
+        f"https://github.com/XTLS/Xray-core/releases/latest/download/{name}.zip"
     ]
     download(urls, zipf)
     with zipfile.ZipFile(zipf) as z:
@@ -160,7 +160,7 @@ def download_cloudflared(path):
     name = "cloudflared-linux-arm64" if a == "arm" else "cloudflared-linux-amd64"
     urls = [
         f"https://download.lycn.qzz.io/{name}",
-        f"https://holy-elisabetta-lyscn-9e416f72.koyeb.app/https://github.com/cloudflare/cloudflared/releases/latest/download/{name}"
+        f"https://github.com/cloudflare/cloudflared/releases/latest/download/{name}"
     ]
     download(urls, path)
     os.chmod(path, 0o755)
@@ -171,7 +171,7 @@ def download_komari(path):
     name = "komari-agent-linux-arm64" if a == "arm" else "komari-agent-linux-amd64"
     urls = [
         f"https://download.lycn.qzz.io/{name}",
-        f"https://holy-elisabetta-lyscn-9e416f72.koyeb.app/https://github.com/komari-monitor/komari-agent/releases/latest/download/{name}"
+        f"https://github.com/komari-monitor/komari-agent/releases/latest/download/{name}"
     ]
     download(urls, path)
     os.chmod(path, 0o755)
