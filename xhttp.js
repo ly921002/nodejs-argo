@@ -37,8 +37,10 @@ const KOMARI_TOKEN = process.env.KOMARI_TOKEN || '';
 
 const state = {
   ready: false,
-  sub: '',
+  uuid: '',
   domain: '',
+  xhttp_path: '',
+  sub: '',
   error: ''
 };
 
@@ -416,6 +418,8 @@ const url =
 
     state.ready = true;
     state.domain = ARGO_DOMAIN;
+    state.uuid = UUID;
+    state.xhttp_path = XHTTP_PATH;
     state.sub = sub;
 
     console.log('Service ready:', ARGO_DOMAIN);
@@ -434,22 +438,19 @@ const app = express();
 app.use(express.static(path.join(__dirname, 'public')));
 
 // 2. API 路由
-app.use((req, res, next) => {
-  if (req.path.startsWith('/api') || req.path === '/health' || req.path === '/logs') {
-    return next();
-  }
-  next();
-});
 app.get('/health', (_, res) => {
-  res.json(state);
+  res.json({
+    ready: state.ready,
+    domain: state.domain,
+    error: state.error
+  });
 });
 
 app.get(`/${SUB_PATH}`, (_, res) => {
-  if (!state.ready) {
-    return res.status(503).send('Not ready');
-  }
+  if (!state.ready) return res.status(503).send('Not ready');
 
-  res.type('text/plain').send(state.sub);
+  const info = `UUID: ${state.uuid}\nXHTTP_PATH: ${state.xhttp_path}\n\nSUB:\n${state.sub}`;
+  res.type('text/plain').send(info);
 });
 
 app.get('/logs', (_, res) => {
