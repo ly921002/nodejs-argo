@@ -242,6 +242,7 @@ def build_sub(domain):
         f"&type=xhttp"
         f"&host={domain}"
         f"&path={XHTTP_PATH}"
+        f"&sni={domain}"
         f"#{ps}"
     )
     print(vless)
