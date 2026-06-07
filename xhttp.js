@@ -316,7 +316,12 @@ function writeXrayConfig(configPath) {
         
           xhttpSettings: {
             path: XHTTP_PATH,
-            mode: 'auto'
+            mode: 'auto',
+            scMaxBufferedPosts: 30,
+            scMaxEachPostBytes: 1000000,
+            scMinPostsIntervalMs: 30,
+            scStreamUpServerSecs: "20-80",
+            xPaddingBytes: "100-1000"
           }
         }
       }
