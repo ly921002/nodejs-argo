@@ -23,7 +23,7 @@ ARGO_PORT = int(os.getenv("ARGO_PORT", 8001))
 ARGO_AUTH = os.getenv("ARGO_AUTH", "")
 ARGO_DOMAIN = os.getenv("ARGO_DOMAIN", "domain")
 XHTTP_PATH_BASE = os.getenv("XHTTP_PATH_BASE", "/api/v1")
-XHTTP_PATH_RANDOM_LEN = os.getenv("XHTTP_PATH_RANDOM_LEN", 8)
+XHTTP_PATH_LEN = os.getenv("XHTTP_PATH_LEN", 8)
 
 CFIP = os.getenv("CFIP", "cdns.doon.eu.org")
 CFPORT = int(os.getenv("CFPORT", 443))
@@ -34,8 +34,8 @@ KOMARI_TOKEN = os.getenv("KOMARI_TOKEN", "")
 
 XHTTP_PATH = (
     f"{XHTTP_PATH_BASE.rstrip('/')}/"
-    f"{''.join(random.choices(string.ascii_letters + string.digits, k=XHTTP_PATH_RANDOM_LEN))}"
-    if XHTTP_PATH_RANDOM_LEN > 0
+    f"{''.join(random.choices(string.ascii_letters + string.digits, k=XHTTP_PATH_LEN))}"
+    if XHTTP_PATH_LEN > 0
     else XHTTP_PATH_BASE
 )
 state = {
