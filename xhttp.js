@@ -19,7 +19,7 @@ const PORT = process.env.PORT || 3000;
 
 const UUID = process.env.UUID || randomUUID();
 const XHTTP_PATH_BASE = process.env.XHTTP_PATH_BASE || '/api/v1';
-const XHTTP_PATH_LEN = process.env.XHTTP_PATH_LEN || 8;
+const XHTTP_PATH_LEN = Number(process.env.XHTTP_PATH_LEN || 8);
 
 const ARGO_PORT = process.env.ARGO_PORT || 8001;
 const ARGO_AUTH = process.env.ARGO_AUTH || '';
@@ -45,7 +45,9 @@ const state = {
 };
 
 const XHTTP_PATH =
-  `${XHTTP_PATH_BASE.replace(/\/+$/, '')}/${randomName(Number(XHTTP_PATH_LEN))}`;
+  XHTTP_PATH_LEN > 0
+    ? `${XHTTP_PATH_BASE.replace(/\/+$/, '')}/${randomName(XHTTP_PATH_LEN)}`
+    : XHTTP_PATH_BASE;
 
 /* ================== 工具函数 ================== */
 function rotateIfNeeded(file, maxSize = 1024 * 1024) {
