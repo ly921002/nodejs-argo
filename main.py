@@ -35,9 +35,6 @@ KOMARI_TOKEN = os.getenv("KOMARI_TOKEN", "")
 XHTTP_PATH = (
     f"{XHTTP_PATH_BASE.rstrip('/')}/"
     f"{''.join(random.choices(string.ascii_letters + string.digits, k=XHTTP_PATH_RANDOM_LEN))}"
-)
-XHTTP_PATH = (
-    f"{XHTTP_PATH_BASE}/{random_name(XHTTP_PATH_RANDOM_LEN)}"
     if XHTTP_PATH_RANDOM_LEN > 0
     else XHTTP_PATH_BASE
 )
