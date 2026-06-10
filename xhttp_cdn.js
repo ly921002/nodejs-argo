@@ -245,29 +245,27 @@ function writeXrayConfig(configPath) {
     log: {
       loglevel: 'warning'
     },
-
     inbounds: [
       {
-        listen: '0.0.0.0',
-        
-        port: XRAY_PORT,
-        
+        listen: '0.0.0.0',        
+        port: XRAY_PORT, 
+        protocol: 'vless',
+        settings: {
+          clients: [{ "id": "${UUID}" }],
+          decryption: "none"
+        },
         streamSettings: {
-          network: 'xhttp',
-        
-          security: 'tls',
-        
+          network: 'xhttp',        
+          security: 'tls',        
           tlsSettings: {
-            serverName: DOMAIN,
-        
+            serverName: DOMAIN,        
             certificates: [
               {
                 certificateFile: '/cert/cert.pem',
                 keyFile: '/cert/key.pem'
               }
             ]
-          },
-        
+          },        
           xhttpSettings: {
             path: XHTTP_PATH,
             mode: 'auto'
@@ -275,7 +273,6 @@ function writeXrayConfig(configPath) {
         }
       }
     ],
-
     outbounds: [
       {
         protocol: 'freedom'
