@@ -14,18 +14,12 @@ const { randomUUID } = require('crypto');
 
 const FILE_PATH = process.env.FILE_PATH || './tmp';
 const SUB_PATH = process.env.SUB_PATH || 'sub';
-const PORT = process.env.PORT || 3000;
 const XHTTP_PATH_BASE = process.env.XHTTP_PATH_BASE || '/api/v1';
 const XHTTP_PATH_LEN = process.env.XHTTP_PATH_LEN || 0;
 const UUID = process.env.UUID || randomUUID();
 
-const XRAY_PORT = Number(process.env.XRAY_PORT || 2096);
-
-const DOMAIN =
-  process.env.DOMAIN || 'domain';
-
-const CFIP = process.env.CFIP || 'www.cloudflare.com';
-const CFPORT = process.env.CFPORT || 443;
+const PORT = Number(process.env.PORT || 2096);
+const DOMAIN = process.env.DOMAIN || 'domain';
 
 const NAME = process.env.NAME || 'VLESS';
 
@@ -37,7 +31,6 @@ const KOMARI_TOKEN = process.env.KOMARI_TOKEN || '';
 const state = {
   ready: false,
   sub: '',
-  domain: '',
   error: ''
 };
 
@@ -248,17 +241,22 @@ function writeXrayConfig(configPath) {
     inbounds: [
       {
         listen: '0.0.0.0',        
-        port: XRAY_PORT, 
+        port: PORT, 
         protocol: 'vless',
         settings: {
-          clients: [{ "id": "${UUID}" }],
-          decryption: "none"
+          clients: [
+            {
+              id: UUID
+            }
+          ],
+          decryption: 'none'
         },
         streamSettings: {
           network: 'xhttp',        
           security: 'tls',        
           tlsSettings: {
-            serverName: DOMAIN,        
+            serverName: DOMAIN, 
+            allowInsecure: false,
             certificates: [
               {
                 certificateFile: '/cert/cert.pem',
@@ -294,7 +292,7 @@ async function buildSub(domain) {
   );
 
 const url =
-`vless://${UUID}@${CFIP}:${CFPORT}?encryption=none&security=tls&sni=${DOMAIN}&host=${DOMAIN}&fp=chrome&alpn=h3%2Ch2&type=xhttp&path=${encodeURIComponent(XHTTP_PATH)}&mode=auto#${ps}`;
+`vless://${UUID}@${DOMAIN}:${PORT}?encryption=none&security=tls&sni=${DOMAIN}&host=${DOMAIN}&fp=chrome&alpn=h3%2Ch2&type=xhttp&path=${encodeURIComponent(XHTTP_PATH)}&mode=auto#${ps}`;
 
   return Buffer.from(url).toString('base64');
 }
