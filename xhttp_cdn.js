@@ -260,9 +260,24 @@ function writeXrayConfig(configPath) {
             serverName: DOMAIN, 
             allowInsecure: false,
             certificates: [
-              {
-                certificateFile: '/cert/cert.pem',
-                keyFile: '/cert/key.pem'
+             {
+                "certificate": [
+                  "-----BEGIN CERTIFICATE-----",
+                  "",
+                  "-----END CERTIFICATE-----",
+                  ""
+                ],
+                "key": [
+                  "-----BEGIN PRIVATE KEY-----",
+                  "",
+                  "-----END PRIVATE KEY-----",
+                  ""
+                ],
+                "ocspStapling": 3600,
+                "oneTimeLoading": false,
+                "usage": "encipherment",
+                "buildChain": false,
+                "useFile": false
               }
             ]
           },        
