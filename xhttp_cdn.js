@@ -21,6 +21,8 @@ const UUID = process.env.UUID || randomUUID();
 const PORT = Number(process.env.PORT || 2096);
 const DOMAIN = process.env.DOMAIN || 'domain';
 
+const CERT = process.env.CERT || '';
+const KEY = process.env.KEY || '';
 const NAME = process.env.NAME || 'VLESS';
 
 const KOMARI_ENDPOINT = process.env.KOMARI_ENDPOINT || '';
@@ -261,18 +263,8 @@ function writeXrayConfig(configPath) {
             allowInsecure: false,
             certificates: [
              {
-                "certificate": [
-                  "-----BEGIN CERTIFICATE-----",
-                  "",
-                  "-----END CERTIFICATE-----",
-                  ""
-                ],
-                "key": [
-                  "-----BEGIN PRIVATE KEY-----",
-                  "",
-                  "-----END PRIVATE KEY-----",
-                  ""
-                ],
+                "certificate": ${CERT},
+                "key": ${KEY},
                 "ocspStapling": 3600,
                 "oneTimeLoading": false,
                 "usage": "encipherment",
