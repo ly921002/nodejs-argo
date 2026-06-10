@@ -263,8 +263,8 @@ function writeXrayConfig(configPath) {
             allowInsecure: false,
             certificates: [
              {
-                "certificate": ${CERT},
-                "key": ${KEY},
+                "certificate": CERT,
+                "key": KEY,
                 "ocspStapling": 3600,
                 "oneTimeLoading": false,
                 "usage": "encipherment",
