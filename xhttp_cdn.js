@@ -9,7 +9,7 @@ const path = require('path');
 const os = require('os');
 const unzipper = require('unzipper');
 const { spawn } = require('child_process');
-
+const { randomUUID } = require('crypto');
 /* ================== 基础配置 ================== */
 
 const FILE_PATH = process.env.FILE_PATH || './tmp';
@@ -17,7 +17,7 @@ const SUB_PATH = process.env.SUB_PATH || 'sub';
 const PORT = process.env.PORT || 3000;
 const XHTTP_PATH_BASE = process.env.XHTTP_PATH_BASE || '/api/v1';
 const XHTTP_PATH_LEN = process.env.XHTTP_PATH_LEN || 0;
-const UUID = process.env.UUID || '';
+const UUID = process.env.UUID || randomUUID();
 
 const XRAY_PORT = Number(process.env.XRAY_PORT || 2096);
 
