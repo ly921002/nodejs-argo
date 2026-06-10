@@ -41,7 +41,9 @@ const state = {
 };
 
 const XHTTP_PATH =
-  `${XHTTP_PATH_BASE.replace(/\/+$/, '')}/${randomName(Number(XHTTP_PATH_LEN))}`;
+  Number(XHTTP_PATH_LEN) > 0
+    ? `${XHTTP_PATH_BASE.replace(/\/+$/, '')}/${randomName(Number(XHTTP_PATH_LEN))}`
+    : XHTTP_PATH_BASE;
 
 /* ================== 工具函数 ================== */
 
