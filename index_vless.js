@@ -42,8 +42,11 @@ const state = {
   error: ''
 };
 
+
 const WS_PATH =
-  `${WS_PATH_BASE.replace(/\/+$/, '')}/${randomName(Number(WS_PATH_LEN))}`;
+  Number(WS_PATH_LEN) > 0
+    ? `${WS_PATH_BASE.replace(/\/+$/, '')}/${randomName(Number(WS_PATH_LEN))}`
+    : WSP_PATH_BASE;
 
 /* ================== 工具函数 ================== */
 
