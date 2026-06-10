@@ -1,5 +1,4 @@
 /**
- * 纯 VLESS + XHTTP + Argo Tunnel + Komari
  * 单文件稳定版
  */
 
@@ -10,25 +9,24 @@ const path = require('path');
 const os = require('os');
 const unzipper = require('unzipper');
 const { spawn } = require('child_process');
-const { randomUUID } = require('crypto');
+
 /* ================== 基础配置 ================== */
 
 const FILE_PATH = process.env.FILE_PATH || './tmp';
 const SUB_PATH = process.env.SUB_PATH || 'sub';
 const PORT = process.env.PORT || 3000;
-
-const UUID = process.env.UUID || randomUUID();
 const XHTTP_PATH_BASE = process.env.XHTTP_PATH_BASE || '/api/v1';
-const XHTTP_PATH_LEN = Number(process.env.XHTTP_PATH_LEN || 8);
+const XHTTP_PATH_LEN = process.env.XHTTP_PATH_LEN || 0;
+const UUID = process.env.UUID || '';
 
 const ARGO_PORT = process.env.ARGO_PORT || 8001;
 const ARGO_AUTH = process.env.ARGO_AUTH || '';
 const ARGO_DOMAIN = process.env.ARGO_DOMAIN || 'domain';
 
-const CFIP = process.env.CFIP || 'www.visa.cn';
+const CFIP = process.env.CFIP || 'www.cloudflare.com';
 const CFPORT = process.env.CFPORT || 443;
 
-const NAME = process.env.NAME || 'VLESS-ARGO';
+const NAME = process.env.NAME || 'Argo-VLESS';
 
 const KOMARI_ENDPOINT = process.env.KOMARI_ENDPOINT || '';
 const KOMARI_TOKEN = process.env.KOMARI_TOKEN || '';
@@ -37,36 +35,16 @@ const KOMARI_TOKEN = process.env.KOMARI_TOKEN || '';
 
 const state = {
   ready: false,
-  uuid: '',
-  domain: '',
-  xhttp_path: '',
   sub: '',
+  domain: '',
   error: ''
 };
 
 const XHTTP_PATH =
-  XHTTP_PATH_LEN > 0
-    ? `${XHTTP_PATH_BASE.replace(/\/+$/, '')}/${randomName(XHTTP_PATH_LEN)}`
-    : XHTTP_PATH_BASE;
+  `${XHTTP_PATH_BASE.replace(/\/+$/, '')}/${randomName(Number(XHTTP_PATH_LEN))}`;
 
 /* ================== 工具函数 ================== */
-function rotateIfNeeded(file, maxSize = 1024 * 1024) {
-  try {
-    if (fs.existsSync(file)) {
-      const stat = fs.statSync(file);
 
-      if (stat.size > maxSize) {
-        fs.renameSync(file, file + '.1');
-        fs.writeFileSync(file, '');
-      }
-    }
-  } catch {}
-}
-
-function writeLog(file, data) {
-  rotateIfNeeded(file);
-  fs.appendFileSync(file, data);
-}
 function randomName(len = 8) {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
 
@@ -103,26 +81,19 @@ function randomUA() {
   return uas[Math.floor(Math.random() * uas.length)];
 }
 
-function spawnWithLog(cmd, args, file, fakeName) {
+function spawnDetached(cmd, args, fakeName) {
+  const devNull = fs.openSync('/dev/null', 'w');
+
   const p = spawn(cmd, args, {
     detached: true,
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: ['ignore', devNull, devNull],
     argv0: fakeName
-  });
-
-  p.stdout.on('data', d => {
-    writeLog(file, d);
-  });
-
-  p.stderr.on('data', d => {
-    writeLog(file, d);
   });
 
   p.unref();
 
   return p.pid;
 }
-
 
 function delayedCleanup(files, delayMs = 60000) {
   setTimeout(() => {
@@ -272,7 +243,7 @@ function startKomari(binPath) {
     return;
   }
 
-  spawnWithLog(
+  spawnDetached(
     binPath,
     [
       '-e',
@@ -280,7 +251,6 @@ function startKomari(binPath) {
       '-t',
       KOMARI_TOKEN
     ],
-    '/tmp/k.log',
     '[systemd-logind]'
   );
 }
@@ -354,9 +324,18 @@ const url =
 
 (async () => {
   try {
+    if (!UUID) {
+      throw new Error('UUID required');
+    }
+
     if (!ARGO_AUTH) {
       throw new Error('ARGO_AUTH required');
     }
+
+    if (!ARGO_DOMAIN) {
+      throw new Error('ARGO_DOMAIN required');
+    }
+
     ensureDir(FILE_PATH);
 
     const xrayPath = path.join(FILE_PATH, randomName());
@@ -381,10 +360,9 @@ const url =
 
     console.log('Starting Xray...');
 
-    spawnWithLog(
+    spawnDetached(
       xrayPath,
       ['run', '-c', configPath],
-      '/tmp/x.log',
       '[kworker/u8:2]'
     );
 
@@ -392,7 +370,7 @@ const url =
 
     console.log('Starting cloudflared...');
 
-    spawnWithLog(
+    spawnDetached(
       cloudflaredPath,
       [
         'tunnel',
@@ -401,8 +379,7 @@ const url =
         '--token',
         ARGO_AUTH
       ],
-      '/tmp/cf.log',
-      '[dbus-daemon]'    
+      '[dbus-daemon]'
     );
 
     if (KOMARI_ENDPOINT && KOMARI_TOKEN) {
@@ -420,8 +397,6 @@ const url =
 
     state.ready = true;
     state.domain = ARGO_DOMAIN;
-    state.uuid = UUID;
-    state.xhttp_path = XHTTP_PATH;
     state.sub = sub;
 
     console.log('Service ready:', ARGO_DOMAIN);
@@ -436,56 +411,21 @@ const url =
 /* ================== HTTP ================== */
 
 const app = express();
-// 1. 静态文件优先
-app.use(express.static(path.join(__dirname, 'public')));
 
-// 2. API 路由
+app.get('/', (_, res) => {
+  res.send('VLESS Argo Service Running');
+});
+
 app.get('/health', (_, res) => {
-  res.json({
-    ready: state.ready,
-    domain: state.domain,
-    error: state.error
-  });
+  res.json(state);
 });
 
 app.get(`/${SUB_PATH}`, (_, res) => {
-  if (!state.ready) return res.status(503).send('Not ready');
-
-  const info = `UUID: ${state.uuid}\nXHTTP_PATH: ${state.xhttp_path}\n\nSUB:\n${state.sub}`;
-  res.type('text/plain').send(info);
-});
-
-app.get('/logs', (_, res) => {
-  try {
-    const xrayLog =
-      fs.existsSync('/tmp/x.log')
-        ? fs.readFileSync('/tmp/x.log', 'utf8')
-        : '';
-
-    const cfLog =
-      fs.existsSync('/tmp/cf.log')
-        ? fs.readFileSync('/tmp/cf.log', 'utf8')
-        : '';
-    const komariLog =
-      fs.existsSync('/tmp/k.log')
-        ? fs.readFileSync('/tmp/k.log', 'utf8')
-        : '';
-    res.type('text/plain').send(
-      '=== XRAY ===\n' +
-      xrayLog +
-      '\n\n=== CLOUDFLARED ===\n' +
-      cfLog +
-      '\n\n=== KOMARI ===\n' +
-      komariLog
-    );
-  } catch (e) {
-    res.status(500).send(e.message);
+  if (!state.ready) {
+    return res.status(503).send('Not ready');
   }
-});
 
-// 3. 首页 fallback（最后）
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.type('text/plain').send(state.sub);
 });
 
 app.listen(PORT, () => {
