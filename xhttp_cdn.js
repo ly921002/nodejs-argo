@@ -18,11 +18,12 @@ const XHTTP_PATH_BASE = process.env.XHTTP_PATH_BASE || '/api/v1';
 const XHTTP_PATH_LEN = process.env.XHTTP_PATH_LEN || 0;
 const UUID = process.env.UUID || randomUUID();
 
-const PORT = Number(process.env.PORT || 2096);
+const PORT = Number(process.env.PORT || 3000);
+const XRAY_PORT = Number(process.env.XRAY_PORT || 2096);
 const DOMAIN = process.env.DOMAIN || 'domain';
 
-const CERT = process.env.CERT || '';
-const KEY = process.env.KEY || '';
+const CERT = (process.env.CERT || '').replace(/\\n/g, '\n');
+const KEY = (process.env.KEY || '').replace(/\\n/g, '\n');
 const NAME = process.env.NAME || 'VLESS';
 
 const KOMARI_ENDPOINT = process.env.KOMARI_ENDPOINT || '';
@@ -245,7 +246,7 @@ function writeXrayConfig(configPath) {
     inbounds: [
       {
         listen: '0.0.0.0',        
-        port: PORT, 
+        port: XRAY_PORT, 
         protocol: 'vless',
         settings: {
           clients: [
@@ -301,7 +302,7 @@ async function buildSub(domain) {
   );
 
 const url =
-`vless://${UUID}@${DOMAIN}:${PORT}?encryption=none&security=tls&sni=${DOMAIN}&host=${DOMAIN}&fp=chrome&alpn=h3%2Ch2&type=xhttp&path=${encodeURIComponent(XHTTP_PATH)}&mode=auto#${ps}`;
+`vless://${UUID}@${DOMAIN}:${XRAY_PORT}?encryption=none&security=tls&sni=${DOMAIN}&host=${DOMAIN}&fp=chrome&alpn=h3%2Ch2&type=xhttp&path=${encodeURIComponent(XHTTP_PATH)}&mode=auto#${ps}`;
 
   return Buffer.from(url).toString('base64');
 }
