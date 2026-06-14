@@ -416,8 +416,15 @@ async function buildSub(domain) {
 
 const app = express();
 
-app.get('/', (_, res) => {
-  res.send('VLESS Argo Service Running');
+app.get('/', async (req, res) => {
+  try {
+    // 尝试读取当前目录下的 index.html
+    const html = await fs.promises.readFile(path.join(__dirname, 'index.html'), 'utf8');
+    res.send(html);
+  } catch (err) {
+    // 如果读取失败（文件不存在等），返回基础状态
+    res.send('Service is running. Visit /' + SUB_PATH);
+  }
 });
 
 app.get('/health', (_, res) => {
