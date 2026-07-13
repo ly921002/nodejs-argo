@@ -22,13 +22,21 @@ const PORT = Number(process.env.PORT || 3000);
 const XRAY_PORT = Number(process.env.XRAY_PORT || 2096);
 const DOMAIN = process.env.DOMAIN || 'domain';
 
-const CERT = (process.env.CERT || '').replace(/\\n/g, '\n');
-const KEY = (process.env.KEY || '').replace(/\\n/g, '\n');
 const NAME = process.env.NAME || 'VLESS';
 
 const KOMARI_ENDPOINT = process.env.KOMARI_ENDPOINT || '';
 const KOMARI_TOKEN = process.env.KOMARI_TOKEN || '';
 
+const CERT_URL = process.env.CERT_URL || '';
+const KEY_URL = process.env.KEY_URL || '';
+const CERT_FILE =
+path.join(FILE_PATH,'cert.pem');
+
+const KEY_FILE =
+path.join(FILE_PATH,'key.pem');
+
+let CERT = '';
+let KEY = '';
 /* ================== 全局状态 ================== */
 
 const state = {
@@ -107,6 +115,49 @@ function delayedCleanup(files, delayMs = 60000) {
 }
 
 /* ================== 下载 ================== */
+async function downloadText(url) {
+  const res = await axios.get(url, {
+    timeout:15000,
+    headers:{
+      'User-Agent':randomUA()
+    },
+    validateStatus:s=>s===200
+  });
+  return res.data;
+}
+
+async function loadCert(){
+ if(
+   fs.existsSync(CERT_FILE)
+   &&
+   fs.existsSync(KEY_FILE)
+ ){
+   CERT=
+   fs.readFileSync(
+     CERT_FILE,
+     'utf8'
+   );
+   KEY=
+   fs.readFileSync(
+     KEY_FILE,
+     'utf8'
+   );
+   console.log('Using cached certificate');
+   return;
+ }
+ CERT =
+ await downloadText(CERT_URL);
+ KEY =
+ await downloadText(KEY_URL);
+ fs.writeFileSync(
+   CERT_FILE,
+   CERT
+ );
+ fs.writeFileSync(
+   KEY_FILE,
+   KEY
+ );
+}
 async function getNodeName() {
   try {
     const meta = await axios.get(
@@ -259,21 +310,20 @@ function writeXrayConfig(configPath) {
         streamSettings: {
           network: 'xhttp',        
           security: 'tls',        
-          tlsSettings: {
-            serverName: DOMAIN, 
-            allowInsecure: false,
-            certificates: [
+          tlsSettings:{
+           serverName:DOMAIN,
+           allowInsecure:false,          
+           certificates:[
              {
-                "certificate": CERT,
-                "key": KEY,
-                "ocspStapling": 3600,
-                "oneTimeLoading": false,
-                "usage": "encipherment",
-                "buildChain": false,
-                "useFile": false
-              }
-            ]
-          },        
+               certificate:[
+                 CERT
+               ],
+               key:[
+                 KEY
+               ]
+             }
+           ]
+          },   
           xhttpSettings: {
             path: XHTTP_PATH,
             mode: 'auto'
@@ -329,7 +379,8 @@ const url =
       console.log('Downloading Komari...');
       await downloadKomari(komariPath);
     }
-
+    console.log('Loading certificate...');
+    await loadCert();
     console.log('Writing config...');
     writeXrayConfig(configPath);
 
