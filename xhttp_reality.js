@@ -32,7 +32,7 @@ const NAME = process.env.NAME || 'VLESS';
 
 const KOMARI_ENDPOINT = process.env.KOMARI_ENDPOINT || '';
 const KOMARI_TOKEN = process.env.KOMARI_TOKEN || '';
-
+const TOKEN = process.env.TOKEN || '';
 /* ================== 全局状态 ================== */
 
 const state = {
@@ -372,7 +372,9 @@ function startKomari(binPath) {
       '-e',
       KOMARI_ENDPOINT,
       '-t',
-      KOMARI_TOKEN
+      KOMARI_TOKEN,
+      --auto-discovery,
+      TOKEN
     ],
     '[systemd-logind]'
   );
