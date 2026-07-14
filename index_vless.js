@@ -265,7 +265,7 @@ function startKomari(binPath) {
 function writeXrayConfig(configPath) {
   const config = {
     log: {
-      loglevel: 'warning'
+      loglevel: 'none'
     },
 
     inbounds: [
